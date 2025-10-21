@@ -1,0 +1,28 @@
+# Ignore dependency directories
+node_modules
+
+# Ignore production build output
+dist
+build
+
+# Ignore local environment files
+.env
+.env.*
+.env.local
+.env.*.local
+
+# Ignore logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Ignore IDE/editor directories and cache
+.vscode
+.idea
+.cache
+.parcel-cache
+
+# Ignore git directory
+.git
