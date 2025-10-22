@@ -214,4 +214,7 @@ $RECYCLE.BIN/
 # Reference: https://intellij-support.jetbrains.com/hc/en-us/articles/206544839
 .idea/
 
+# Related to Philo
+copierv1.py
+compiled_code.txt
 # End of https://www.toptal.com/developers/gitignore/api/windows,node,react,linux
