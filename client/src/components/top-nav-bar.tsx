@@ -1,7 +1,6 @@
 import { useId } from "react"
 import { MicIcon, SearchIcon } from "lucide-react"
 
-import Logo from "@/components/logo"
 import ThemeToggle from "@/components/theme-toggle"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -14,13 +13,17 @@ export default function NavBar() {
       <div className="flex h-16 items-center justify-between gap-4">
         {/* Logo */}
         <div className="flex-1">
-          <a href="#" className="text-primary hover:text-primary/90">
-            <Logo />
+          <a href="#" className="text-primary hover:text-primary/90 flex items-center">
+            <img
+              src="/Reddit_Symbol_23.svg"
+              alt="Logo"
+              className="h-10 w-auto"
+            />
           </a>
         </div>
+
         {/* Middle area */}
         <div className="grow max-sm:hidden">
-          {/* Search form */}
           <div className="relative mx-auto w-full max-w-xs">
             <Input
               id={id}
@@ -40,6 +43,7 @@ export default function NavBar() {
             </button>
           </div>
         </div>
+
         {/* Right side */}
         <div className="flex flex-1 items-center justify-end gap-2">
           <Button asChild variant="ghost" size="sm" className="text-sm">
