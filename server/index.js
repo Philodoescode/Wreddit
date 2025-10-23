@@ -17,6 +17,8 @@ mongoose.connect(MONGO_URI)
 app.use(cors());
 app.use(morgan('dev'));
 app.use(express.json());
+app.use('/api/users', require('./routes/user.routes'));
+
 
 app.get('/', (req, res) => {
   res.send('Hello from the Wreddit server! MongoDB connection initiated.');
