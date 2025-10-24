@@ -1,6 +1,7 @@
 import NavBar from "@/components/top-nav-bar";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
 
 function App() {
   return (
@@ -17,9 +18,11 @@ function App() {
             <p className="text-xl text-muted-foreground mt-4">
               The best place to share and discuss what's new and popular on the web.
             </p>
-            <Button size="lg" className="mt-8">
-              Get Started
-            </Button>
+            <Link to = '/signup'>
+              <Button size="lg" className="mt-8">
+                Get Started
+              </Button>
+            </Link>
           </section>
         </main>
 
