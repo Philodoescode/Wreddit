@@ -50,7 +50,7 @@ export default function NavBar() {
             <a href="#">Community</a>
           </Button>
           <Button asChild size="sm" className="text-sm">
-            <a href="#">Get Started</a>
+            <a href="/signup">Get Started</a>
           </Button>
           <ThemeToggle />
         </div>
