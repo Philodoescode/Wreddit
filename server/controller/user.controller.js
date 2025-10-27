@@ -11,16 +11,15 @@ const signToken = (user) =>
 
 const signup = async (req, res) => {
     try {
+        // 1. Destructure only the fields sent from the simplified form
+        let { username, email, password } = req.body;
 
-        let { username, email, password, firstName, lastName, bio } = req.body;
-
-        //validation for user reqired details ------------------------------------------------
-
-        if (!username || !email || !password ) {
-            return res.status(400).json({ status: "fail", message: "All fields are required" });
+        // 2. Validation for required details
+        if (!username || !email || !password) {
+            return res.status(400).json({ status: "fail", message: "Username, email, and password are required" });
         }
 
-        console.log("User Controller - Signup: ", username, email);
+        console.log("User Controller - Signup Request For:", username, email);
 
         username = username.trim();
         email = email.toLowerCase().trim();
@@ -38,21 +37,18 @@ const signup = async (req, res) => {
             return res.status(400).json({ status: "fail", message: "Password must be at least 8 characters long" });
         }
 
-        // 7mdallah 3la elsalama -----------------------------------------------------
-
+        // 3. Hash password and create user with only the essential fields
         const passwordHash = await bcrypt.hash(password, 10);
-        const uploadedPhoto = req.file ? req.file.filename : 'default-user.png';
 
         const user = await User.create({
-            username, email, passwordHash,
-            firstName: firstName?.trim() || '',
-            lastName: lastName?.trim() || '',
-            bio: bio?.trim() || '',
-            userPhotoUrl: uploadedPhoto,
+            username,
+            email,
+            passwordHash,
         });
 
         const token = signToken(user);
 
+        // The user object from the database will contain the default empty values for the other fields
         const safeUser = {
             id: user._id,
             username: user.username,
@@ -63,12 +59,13 @@ const signup = async (req, res) => {
             userPhotoUrl: user.userPhotoUrl,
         };
 
-        console.log("New User:", safeUser);
-
+        console.log("New User Created:", safeUser);
 
         res.status(201).json({ status: "success", token: token, data: { user: safeUser } });
     } catch (error) {
-        res.status(500).json({ status: "fail", message: `Error in Sign up ${error.message}` });
+        // Add more detailed server-side logging for easier debugging
+        console.error("SIGNUP FAILED:", error);
+        res.status(500).json({ status: "fail", message: `An unexpected error occurred: ${error.message}` });
     }
 }
 

@@ -14,7 +14,12 @@ mongoose.connect(MONGO_URI)
   .then(() => console.log('MongoDB connection successful!'))
   .catch((err) => console.error('MongoDB connection error:', err.message));
 
-app.use(cors());
+// Explicitly configure CORS to allow requests from the client's origin.
+// This must be placed before you register any routes.
+app.use(cors({
+  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+}));
+
 app.use(morgan('dev'));
 app.use(express.json());
 app.use('/api/users', require('./routes/user.routes'));

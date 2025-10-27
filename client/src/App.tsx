@@ -1,9 +1,10 @@
 import NavBar from "@/components/top-nav-bar";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
+import { useAuthModal } from "@/context/auth-modal-provider";
 
 function App() {
+  const { openModal } = useAuthModal();
   return (
     <ThemeProvider>
       {/* Full-page layout with sticky footer */}
@@ -18,11 +19,9 @@ function App() {
             <p className="text-xl text-muted-foreground mt-4">
               The best place to share and discuss what's new and popular on the web.
             </p>
-            <Link to = '/signup'>
-              <Button size="lg" className="mt-8">
-                Get Started
-              </Button>
-            </Link>
+            <Button size="lg" className="mt-8" onClick={() => openModal("signup")}>
+              Get Started
+            </Button>
           </section>
         </main>
 

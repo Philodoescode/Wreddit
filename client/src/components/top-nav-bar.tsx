@@ -4,9 +4,11 @@ import { MicIcon, SearchIcon } from "lucide-react"
 import ThemeToggle from "@/components/theme-toggle"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { useAuthModal } from "@/context/auth-modal-provider"
 
 export default function NavBar() {
   const id = useId()
+  const { openModal } = useAuthModal();
 
   return (
     <header className="border-b px-4 md:px-6">
@@ -49,8 +51,8 @@ export default function NavBar() {
           <Button asChild variant="ghost" size="sm" className="text-sm">
             <a href="#">Community</a>
           </Button>
-          <Button asChild size="sm" className="text-sm">
-            <a href="/signup">Get Started</a>
+          <Button size="sm" className="text-sm" onClick={() => openModal('login')}>
+            Log In
           </Button>
           <ThemeToggle />
         </div>

@@ -1,5 +1,11 @@
 import { useId, useState } from "react"
 import { EyeIcon, EyeOffIcon } from "lucide-react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
+import { useNavigate } from "react-router-dom"
+import api from "@/lib/api"
+import { useAuthModal } from "@/context/auth-modal-provider"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -13,18 +19,21 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
 // --- New Reusable Password Input Component (based on your code) ---
-const PasswordInput = ({ id }: { id: string }) => {
+const PasswordInput = (props: React.ComponentProps<typeof Input>) => {
   const [isVisible, setIsVisible] = useState(false)
   const toggleVisibility = () => setIsVisible((prevState) => !prevState)
+  const id = useId()
+  const inputId = props.id || id
 
   return (
     <div className="relative">
       <Input
-        id={id}
+        id={inputId}
         className="pe-9"
         placeholder="Enter your password"
         type={isVisible ? "text" : "password"}
         required
+        {...props}
       />
       <button
         className="absolute inset-y-0 end-0 flex h-full w-9 items-center justify-center rounded-e-md text-muted-foreground/80 transition-[color,box-shadow] outline-none hover:text-foreground focus:z-10 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50"
@@ -32,7 +41,7 @@ const PasswordInput = ({ id }: { id: string }) => {
         onClick={toggleVisibility}
         aria-label={isVisible ? "Hide password" : "Show password"}
         aria-pressed={isVisible}
-        aria-controls={id}
+        aria-controls={inputId}
       >
         {isVisible ? (
           <EyeOffIcon size={16} aria-hidden="true" />
@@ -43,6 +52,7 @@ const PasswordInput = ({ id }: { id: string }) => {
     </div>
   )
 }
+
 
 // --- Login Form Component ---
 const LoginForm = () => {
@@ -72,113 +82,160 @@ const LoginForm = () => {
   )
 }
 
+// --- Sign Up Form Schema and Type ---
+const signupSchema = z.object({
+  username: z.string().min(3, "Your username must be at least 3 characters long"),
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(8, "Your password must be at least 8 characters long"),
+})
+
+type SignupData = z.infer<typeof signupSchema>
+
 // --- Sign Up Form Component ---
 const SignUpForm = () => {
-  const id = useId()
+  const navigate = useNavigate()
+  const { closeModal } = useAuthModal();
+  const [serverError, setServerError] = useState<string | null>(null)
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<SignupData>({ resolver: zodResolver(signupSchema) })
+
+  async function onSubmit(values: SignupData) {
+    try {
+      setServerError(null)
+      await api.post("/users/signup", values)
+      closeModal();
+      navigate("/") // Navigate to home on success
+    } catch (err: any) {
+      setServerError(
+        err?.response?.data?.message || "An unknown error occurred during signup."
+      )
+    }
+  }
+
   return (
-    <form className="space-y-5">
-      <div className="space-y-4">
-        <div className="*:not-first:mt-2">
-          <Label htmlFor={`${id}-email`}>Email</Label>
-          <Input
-            id={`${id}-email`}
-            placeholder="example@email.com"
-            type="email"
-            autoComplete="email"
-            required
-          />
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      {serverError && (
+        <div className="text-sm border border-destructive/50 text-destructive rounded-md p-3 bg-destructive/10">
+          {serverError}
         </div>
-        <div className="*:not-first:mt-2">
-          <Label htmlFor={`${id}-username`}>Username</Label>
-          <Input
-            id={`${id}-username`}
-            placeholder="wredditer123"
-            type="text"
-            autoComplete="username"
-            required
-          />
-        </div>
-        <div className="*:not-first:mt-2">
-          <Label htmlFor={`${id}-password`}>Password</Label>
-          <PasswordInput id={`${id}-password`} />
-        </div>
+      )}
+
+      <div className="space-y-2">
+        <Label htmlFor="email">Email</Label>
+        <Input
+          id="email"
+          placeholder="example@email.com"
+          type="email"
+          autoComplete="email"
+          {...register("email")}
+        />
+        {errors.email && (
+          <p className="text-sm text-destructive mt-1">{errors.email.message}</p>
+        )}
       </div>
-      <Button type="submit" className="w-full">
-        Sign Up
+
+      <div className="space-y-2">
+        <Label htmlFor="username">Username</Label>
+        <Input
+          id="username"
+          placeholder="wredditer123"
+          type="text"
+          autoComplete="username"
+          {...register("username")}
+        />
+        {errors.username && (
+          <p className="text-sm text-destructive mt-1">
+            {errors.username.message}
+          </p>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="password">Password</Label>
+        <PasswordInput id="password" {...register("password")} />
+        {errors.password && (
+          <p className="text-sm text-destructive mt-1">
+            {errors.password.message}
+          </p>
+        )}
+      </div>
+
+      <Button type="submit" className="w-full" disabled={isSubmitting}>
+        {isSubmitting ? "Creating Account..." : "Sign Up"}
       </Button>
     </form>
   )
 }
 
-// --- Main Auth Component ---
-export default function AuthComponent() {
-  const [isOpen, setIsOpen] = useState(false)
-  const [authMode, setAuthMode] = useState<"signup" | "login">("login")
 
-  const openModal = () => {
-    setAuthMode("login") // Always open in login mode
-    setIsOpen(true)
-  }
+// --- Main Auth Modal Component ---
+export default function AuthModal() {
+  const { isOpen, closeModal, mode, setMode } = useAuthModal();
+
+  const onOpenChange = (open: boolean) => {
+    if (!open) {
+      closeModal();
+    }
+  };
+
 
   return (
-    <>
-      <Button variant="outline" onClick={openModal}>
-        Log In
-      </Button>
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <div className="flex flex-col items-center gap-4 pt-4">
+          <img
+            src="/Reddit_Symbol_23.svg"
+            alt="Wreddit Logo"
+            className="h-10 w-10"
+          />
+          <DialogHeader>
+            <DialogTitle className="text-center">
+              {mode === "signup"
+                ? "Sign up for Wreddit"
+                : "Log in to Wreddit"}
+            </DialogTitle>
+            <DialogDescription className="text-center">
+              {mode === "signup"
+                ? "We just need a few details to get you started."
+                : "Welcome back! Enter your details to continue."}
+            </DialogDescription>
+          </DialogHeader>
+        </div>
 
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent>
-          <div className="flex flex-col items-center gap-4 pt-4">
-            <img
-              src="/Reddit_Symbol_23.svg"
-              alt="Wreddit Logo"
-              className="h-10 w-10"
-            />
-            <DialogHeader>
-              <DialogTitle className="text-center">
-                {authMode === "signup"
-                  ? "Sign up for Wreddit"
-                  : "Log in to Wreddit"}
-              </DialogTitle>
-              <DialogDescription className="text-center">
-                {authMode === "signup"
-                  ? "We just need a few details to get you started."
-                  : "Welcome back! Enter your details to continue."}
-              </DialogDescription>
-            </DialogHeader>
-          </div>
+        {mode === "signup" ? <SignUpForm /> : <LoginForm />}
 
-          {authMode === "signup" ? <SignUpForm /> : <LoginForm />}
-
-          {authMode === "signup" && (
-            <p className="px-8 text-center text-xs text-muted-foreground">
-              By signing up, you agree to our{" "}
-              <a
-                className="underline underline-offset-4 hover:text-primary"
-                href="#"
-              >
-                Terms of Service
-              </a>
-              .
-            </p>
-          )}
-
+        {mode === "signup" && (
           <p className="px-8 text-center text-xs text-muted-foreground">
-            {authMode === "signup"
-              ? "Already a Wredditor?"
-              : "New to Wreddit?"}{" "}
-            <button
-              type="button"
-              onClick={() =>
-                setAuthMode(authMode === "signup" ? "login" : "signup")
-              }
+            By signing up, you agree to our{" "}
+            <a
               className="underline underline-offset-4 hover:text-primary"
+              href="#"
             >
-              {authMode === "signup" ? "Log In" : "Sign Up"}
-            </button>
+              Terms of Service
+            </a>
+            .
           </p>
-        </DialogContent>
-      </Dialog>
-    </>
+        )}
+
+        <p className="px-8 text-center text-xs text-muted-foreground">
+          {mode === "signup"
+            ? "Already a Wredditor?"
+            : "New to Wreddit?"}{" "}
+          <button
+            type="button"
+            onClick={() =>
+              setMode(mode === "signup" ? "login" : "signup")
+            }
+            className="underline underline-offset-4 hover:text-primary"
+          >
+            {mode === "signup" ? "Log In" : "Sign Up"}
+          </button>
+        </p>
+      </DialogContent>
+    </Dialog>
   )
 }
