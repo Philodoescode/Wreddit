@@ -4,9 +4,15 @@ import { MicIcon, SearchIcon } from "lucide-react"
 import ThemeToggle from "@/components/theme-toggle"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { useAuthModal } from "@/context/auth-modal-provider"
+import { useAuth } from "@/context/auth-provider"
+import Notifications from "@/components/notifications"
+import OnlineAvatar from "@/components/online-avatar"
 
 export default function NavBar() {
   const id = useId()
+  const { openModal } = useAuthModal();
+  const { isAuthenticated } = useAuth();
 
   return (
     <header className="border-b px-4 md:px-6">
@@ -46,12 +52,18 @@ export default function NavBar() {
 
         {/* Right side */}
         <div className="flex flex-1 items-center justify-end gap-2">
-          <Button asChild variant="ghost" size="sm" className="text-sm">
-            <a href="#">Community</a>
-          </Button>
-          <Button asChild size="sm" className="text-sm">
-            <a href="/signup">Get Started</a>
-          </Button>
+          {isAuthenticated ? (
+            // Logged In: Show Notifications and Avatar
+            <div className="flex items-center gap-3">
+              <Notifications />
+              <OnlineAvatar />
+            </div>
+          ) : (
+            // Logged Out: Show Login button
+            <Button size="sm" className="text-sm" onClick={() => openModal('login')}>
+              Log In
+            </Button>
+          )}
           <ThemeToggle />
         </div>
       </div>
