@@ -27,7 +27,7 @@ services:
     image: mongo:latest
     container_name: wreddit_mongo
     ports:
-      - "27017:27017"
+      - "27018:27017"
     volumes:
       - mongo-data:/data/db
 
