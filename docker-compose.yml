@@ -9,6 +9,7 @@ services:
       - /app/node_modules
     environment:
       - MONGO_URI=mongodb://mongo:27017/wreddit
+      - JWT_SECRET=dev-secret
     depends_on:
       - mongo
 
