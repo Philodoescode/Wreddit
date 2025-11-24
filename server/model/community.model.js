@@ -9,6 +9,12 @@ const communitySchema = new mongoose.Schema({
             minlength: 3,
             maxlength: 21,
             index: true,
+            validate: {
+                validator: function (v) {
+                    return /^[a-zA-Z0-9_-]+$/.test(v);
+                },
+                message: 'Community name can only contain letters, numbers, underscores, and hyphens'
+            }
         },
         title: {
             type: String,

@@ -1,13 +1,10 @@
+const mongoose = require('mongoose');
 const Community = require('../model/community.model');
 const Subscription = require("../model/subscription.model");
 
 const createCommunity = async (req, res) => {
     try {
         const {name, title, description, iconImage, bannerImage, privacyType, rules, flairs} = req.body;
-
-        if (!req.user) {
-            return res.status(401).json({status: "fail", message: "Unauthorized"});
-        }
 
         if (!name || !title) {
             return res.status(400).json({status: "fail", message: "Name and title are required"});
@@ -18,22 +15,36 @@ const createCommunity = async (req, res) => {
             return res.status(400).json({status: "fail", message: "Community name already in use"});
         }
 
-        const community = await Community.create({
-            name,
-            title,
-            description,
-            iconImage,
-            bannerImage,
-            creator: req.user.id,
-            privacyType,
-            rules,
-            flairs,
-        });
 
-        await Subscription.create({
-            user: req.user.id,
-            community: community._id,
-        });
+        // Create community and subscription in a transaction
+        const session = await mongoose.startSession();
+        session.startTransaction();
+        try {
+            const community = await Community.create([{
+                name,
+                title,
+                description,
+                iconImage,
+                bannerImage,
+                creator: req.user.id,
+                privacyType,
+                rules,
+                flairs,
+            }], {session});
+
+            await Subscription.create([{
+                user: req.user.id,
+                community: community[0]._id,
+            }], {session});
+
+            await session.commitTransaction();
+            res.status(201).json({status: "success", data: community[0]});
+        } catch (error) {
+            await session.abortTransaction();
+            res.status(500).json({status: "fail", message: `Error in creating community: ${error.message}`});
+        } finally {
+            await session.endSession();
+        }
 
         res.status(201).json({status: "success", data: community});
     } catch (error) {
