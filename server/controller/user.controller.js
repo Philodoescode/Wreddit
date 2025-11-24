@@ -61,6 +61,7 @@ const signup = async (req, res) => {
 
         console.log("New User Created:", safeUser);
 
+        // Modification: Return the user object along with the token upon successful signup
         res.status(201).json({ status: "success", token: token, data: { user: safeUser } });
     } catch (error) {
         // Add more detailed server-side logging for easier debugging

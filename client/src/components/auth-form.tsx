@@ -6,6 +6,7 @@ import { z } from "zod"
 import { useNavigate } from "react-router-dom"
 import api from "@/lib/api"
 import { useAuthModal } from "@/context/auth-modal-provider"
+import { useAuth } from "@/context/auth-provider"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -53,12 +54,54 @@ const PasswordInput = (props: React.ComponentProps<typeof Input>) => {
   )
 }
 
+// --- Login Form Schema ---
+const loginSchema = z.object({
+  identifierType: z.string().min(1, "Username or Email is required"),
+  password: z.string().min(1, "Password is required"),
+})
+
+type LoginData = z.infer<typeof loginSchema>
+
 
 // --- Login Form Component ---
 const LoginForm = () => {
   const id = useId()
+  const { closeModal } = useAuthModal();
+  const { login } = useAuth();
+  const [serverError, setServerError] = useState<string | null>(null)
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginData>({ resolver: zodResolver(loginSchema) })
+
+  async function onSubmit(values: LoginData) {
+    try {
+      setServerError(null)
+      const response = await api.post("/users/login", values)
+
+      // Extract token and user from response
+      const { token, data } = response.data;
+
+      // Update global auth state
+      login(token, data.user);
+
+      closeModal();
+    } catch (err: any) {
+      setServerError(
+        err?.response?.data?.message || "Invalid credentials."
+      )
+    }
+  }
+
   return (
-    <form className="space-y-5">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+      {serverError && (
+        <div className="text-sm border border-destructive/50 text-destructive rounded-md p-3 bg-destructive/10">
+          {serverError}
+        </div>
+      )}
       <div className="space-y-4">
         <div className="*:not-first:mt-2">
           <Label htmlFor={`${id}-login-credential`}>Username or Email</Label>
@@ -67,16 +110,25 @@ const LoginForm = () => {
             placeholder="wredditer123 or email"
             type="text"
             autoComplete="username"
-            required
+            {...register("identifierType")}
           />
+          {errors.identifierType && (
+            <p className="text-sm text-destructive mt-1">{errors.identifierType.message}</p>
+          )}
         </div>
         <div className="*:not-first:mt-2">
           <Label htmlFor={`${id}-login-password`}>Password</Label>
-          <PasswordInput id={`${id}-login-password`} />
+          <PasswordInput
+            id={`${id}-login-password`}
+            {...register("password")}
+          />
+          {errors.password && (
+            <p className="text-sm text-destructive mt-1">{errors.password.message}</p>
+          )}
         </div>
       </div>
-      <Button type="submit" className="w-full">
-        Log In
+      <Button type="submit" className="w-full" disabled={isSubmitting}>
+        {isSubmitting ? "Logging In..." : "Log In"}
       </Button>
     </form>
   )
@@ -95,6 +147,7 @@ type SignupData = z.infer<typeof signupSchema>
 const SignUpForm = () => {
   const navigate = useNavigate()
   const { closeModal } = useAuthModal();
+  const { login } = useAuth(); // Import login function
   const [serverError, setServerError] = useState<string | null>(null)
 
   const {
@@ -106,7 +159,15 @@ const SignUpForm = () => {
   async function onSubmit(values: SignupData) {
     try {
       setServerError(null)
-      await api.post("/users/signup", values)
+      const response = await api.post("/users/signup", values)
+
+      // Auto-Login After First Signup
+      const { token, data } = response.data;
+
+      if (token && data?.user) {
+         login(token, data.user);
+      }
+
       closeModal();
       navigate("/") // Navigate to home on success
     } catch (err: any) {
