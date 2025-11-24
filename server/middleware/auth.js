@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const User = require("../model/user.model");
 
 /**
  * Authentication Middleware
@@ -9,7 +10,7 @@ const jwt = require('jsonwebtoken');
  *   // req.user is available here
  * });
  */
-const authenticate = (req, res, next) => {
+const authenticate = async (req, res, next) => {
     try {
         // Get token from Authorization header
         const authHeader = req.headers.authorization;
@@ -26,6 +27,13 @@ const authenticate = (req, res, next) => {
 
         // Verify token
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const user = await User.findById(decoded.sub);
+        if (!user) {
+            return res.status(401).json({
+                success: false,
+                message: 'User for this token not found.'
+            });
+        }
 
         // Attach user info to request object
         req.user = {

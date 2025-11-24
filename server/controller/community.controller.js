@@ -10,7 +10,7 @@ const createCommunity = async (req, res) => {
             return res.status(400).json({status: "fail", message: "Name and title are required"});
         }
 
-        const existingCommunity = await Community.findOne({name: name});
+        const existingCommunity = await Community.findOne({name});
         if (existingCommunity) {
             return res.status(400).json({status: "fail", message: "Community name already in use"});
         }
