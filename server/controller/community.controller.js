@@ -3,19 +3,19 @@ const Subscription = require("../model/subscription.model");
 
 const createCommunity = async (req, res) => {
     try {
-        const { name, title, description, iconImage, bannerImage, privacyType, rules, flairs } = req.body;
+        const {name, title, description, iconImage, bannerImage, privacyType, rules, flairs} = req.body;
 
         if (!req.user) {
-            return res.status(401).json({ status: "fail", message: "Unauthorized" });
+            return res.status(401).json({status: "fail", message: "Unauthorized"});
         }
 
         if (!name || !title) {
-            return res.status(400).json({ status: "fail", message: "Name and title are required" });
+            return res.status(400).json({status: "fail", message: "Name and title are required"});
         }
 
-        const existingCommunity = await Community.findOne({ name: name });
+        const existingCommunity = await Community.findOne({name: name});
         if (existingCommunity) {
-            return res.status(400).json({ status: "fail", message: "Community name already in use" });
+            return res.status(400).json({status: "fail", message: "Community name already in use"});
         }
 
         const community = await Community.create({
@@ -35,13 +35,22 @@ const createCommunity = async (req, res) => {
             community: community._id,
         });
 
-        res.status(201).json({ status: "success", data: community });
-    }
-    catch (error) {
-        res.status(500).json({ status: "fail", message: `Error in creating community: ${error.message}` });
+        res.status(201).json({status: "success", data: community});
+    } catch (error) {
+        res.status(500).json({status: "fail", message: `Error in creating community: ${error.message}`});
     }
 }
 
+const getAllCommunities = async (req, res) => {
+    try {
+        const communities = await Community.find().select('name title iconImage memberCount');
+        res.status(200).json({status: "success", data: communities});
+    } catch (error) {
+        res.status(500).json({status: "fail", message: error.message});
+    }
+};
+
 module.exports = {
     createCommunity,
+    getAllCommunities,
 }
