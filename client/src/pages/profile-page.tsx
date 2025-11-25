@@ -109,10 +109,10 @@ export default function ProfilePage() {
                   <h1 className="text-2xl md:text-3xl font-bold">{user.firstName} {user.lastName}</h1>
                   <p className="text-muted-foreground font-medium">u/{user.username}</p>
                 </div>
-                <div className="flex gap-2">
+                {/* <div className="flex gap-2">
                     <Button>Follow</Button>
                     <Button variant="outline">Chat</Button>
-                </div>
+                </div> */}
               </div>
             </div>
           </div>

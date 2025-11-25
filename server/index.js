@@ -25,6 +25,7 @@ app.use(morgan('dev'));
 app.use(express.json());
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/assets', express.static(path.join(__dirname, 'assets')));
 
 app.use('/api/users', require('./routes/user.routes'));
 app.use('/api/communities', require('./routes/community.routes'));
