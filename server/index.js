@@ -23,6 +23,7 @@ app.use(cors({
 app.use(morgan('dev'));
 app.use(express.json());
 app.use('/api/users', require('./routes/user.routes'));
+app.use('/api/communities', require('./routes/community.routes'));
 
 
 app.get('/', (req, res) => {
