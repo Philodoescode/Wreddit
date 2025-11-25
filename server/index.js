@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
 const mongoose = require('mongoose');
+const path = require('path');
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -22,6 +23,9 @@ app.use(cors({
 
 app.use(morgan('dev'));
 app.use(express.json());
+
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 app.use('/api/users', require('./routes/user.routes'));
 app.use('/api/communities', require('./routes/community.routes'));
 
