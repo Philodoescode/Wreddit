@@ -45,7 +45,7 @@ export default function OnlineAvatar() {
         <Button variant="ghost" className="h-auto p-0 hover:bg-transparent rounded-full">
       <Avatar>
         <AvatarImage src={getImageUrl(user.userPhotoUrl)} alt={user.username} className="object-cover" />
-        <AvatarFallback>{user.username.substring(0, 2).toUpperCase()}</AvatarFallback>
+        {/* <AvatarFallback>{user.username.substring(0, 2).toUpperCase()}</AvatarFallback> */}
       </Avatar>
       <span className="absolute -end-0.5 -bottom-0.5 size-3 rounded-full border-2 border-background bg-emerald-500">
         <span className="sr-only">Online</span>

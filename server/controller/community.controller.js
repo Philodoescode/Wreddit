@@ -47,7 +47,22 @@ const getAllCommunities = async (req, res) => {
     }
 };
 
+const getCommunityByName = async (req, res) => {
+  const { name } = req.params;
+  try {
+    const community = await Community.findOne({ name })
+      .populate("creator", "username")
+      .select("-__v");
+      
+    if (!community) return res.status(404).json({ message: "Not found" });
+    
+    res.json({ status: "success", data: community });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
 module.exports = {
     createCommunity,
     getAllCommunities,
+    getCommunityByName
 }
