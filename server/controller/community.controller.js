@@ -1,4 +1,3 @@
-const mongoose = require('mongoose');
 const Community = require('../model/community.model');
 const Subscription = require("../model/subscription.model");
 
@@ -15,36 +14,23 @@ const createCommunity = async (req, res) => {
             return res.status(400).json({status: "fail", message: "Community name already in use"});
         }
 
+        // --- MODIFIED: Transaction logic removed for standalone MongoDB ---
+        const community = await Community.create({
+            name,
+            title,
+            description,
+            iconImage,
+            bannerImage,
+            creator: req.user.id,
+            privacyType,
+            rules,
+            flairs,
+        });
 
-        // Create community and subscription in a transaction
-        const session = await mongoose.startSession();
-        session.startTransaction();
-        try {
-            const community = await Community.create([{
-                name,
-                title,
-                description,
-                iconImage,
-                bannerImage,
-                creator: req.user.id,
-                privacyType,
-                rules,
-                flairs,
-            }], {session});
-
-            await Subscription.create([{
-                user: req.user.id,
-                community: community[0]._id,
-            }], {session});
-
-            await session.commitTransaction();
-            res.status(201).json({status: "success", data: community[0]});
-        } catch (error) {
-            await session.abortTransaction();
-            res.status(500).json({status: "fail", message: `Error in creating community: ${error.message}`});
-        } finally {
-            await session.endSession();
-        }
+        await Subscription.create({
+            user: req.user.id,
+            community: community._id,
+        });
 
         res.status(201).json({status: "success", data: community});
     } catch (error) {

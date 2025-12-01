@@ -8,7 +8,8 @@ services:
       - ./server:/app
       - /app/node_modules
     environment:
-      - MONGO_URI=mongodb://mongo:27017/wreddit?replicaSet=rs0
+      # REVISED: The ?replicaSet=rs0 parameter MUST be removed.
+      - MONGO_URI=mongodb://mongo:27017/wreddit
       - JWT_SECRET=dev-secret
     depends_on:
       - mongo
@@ -31,12 +32,9 @@ services:
       - "27018:27017"
     volumes:
       - mongo-data:/data/db
-    command: ["--replSet", "rs0", "--bind_ip_all", "--port", "27017"]
-    healthcheck:
-      test: |
-        test $$(mongosh --quiet --eval "try { rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: 'mongo:27017' }] }).ok } catch (_) { rs.status().ok }") -eq 1
-      interval: 10s
-      start_period: 5s
+    # REVISED: Removed replica set and healthcheck.
+    # This runs a simple, standalone MongoDB instance.
+    command: ["--bind_ip_all"]
 
 volumes:
   mongo-data:

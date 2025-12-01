@@ -41,8 +41,6 @@ const calculateDate = (date) => {
 // ============ Auth functions ============
 
 const signup = async (req, res) => {
-    const defaultAvatar = "../assets/def_avatar.png";
-    const defaultBanner = "../assets/def_banner.png";
 
     try {
         // 1. Destructure only the fields sent from the simplified form
@@ -78,8 +76,8 @@ const signup = async (req, res) => {
             username,
             email,
             passwordHash,
-            userPhotoUrl: defaultAvatar,
-            profileBannerUrl: defaultBanner,
+            userPhotoUrl: null,
+            profileBannerUrl: null,
         });
 
         const token = signToken(user);
