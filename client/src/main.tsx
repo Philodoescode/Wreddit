@@ -8,6 +8,8 @@ import { AuthProvider } from './context/auth-provider.tsx'
 import AuthModal from './components/auth-form.tsx'
 import HomePage from './pages/home-page.tsx'
 import ProfilePage from './pages/profile-page.tsx'
+import CreateCommunity from './components/CreateCommunity.tsx'
+import CommunityPage      from "./pages/CreateCommunityPage.tsx";
 
 
 createRoot(document.getElementById('root')!).render(
@@ -19,6 +21,8 @@ createRoot(document.getElementById('root')!).render(
             <Route path="/" element={<App />}>
               <Route index element={<HomePage />} />
               <Route path="user/:username" element={<ProfilePage />} />
+              <Route path="/create-community" element={<CreateCommunity />} />
+              <Route path="r/:communityName" element={<CommunityPage />} />
             </Route>
           </Routes>
           <AuthModal />

@@ -1,5 +1,6 @@
 import { useId } from "react"
 import { MicIcon, SearchIcon } from "lucide-react"
+import { Link } from "react-router-dom"; // Add this import
 
 import ThemeToggle from "@/components/theme-toggle"
 import { Button } from "@/components/ui/button"
@@ -53,8 +54,11 @@ export default function NavBar() {
         {/* Right side */}
         <div className="flex flex-1 items-center justify-end gap-2">
           {isAuthenticated ? (
-            // Logged In: Show Notifications and Avatar
+            // Logged In: Show Create Community, Notifications, and Avatar
             <div className="flex items-center gap-3">
+              <Button variant="outline" size="sm" asChild>
+                <Link to="/create-community">Create Community</Link>
+              </Button>
               <Notifications />
               <OnlineAvatar />
             </div>
