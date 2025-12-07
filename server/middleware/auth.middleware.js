@@ -1,23 +1,29 @@
-const jwt = require('jsonwebtoken');
+const jwt = require("jsonwebtoken");
 
-const protect = async (req, res, next) => {
-    try {
-        console.log("AUTH HEADER RECEIVED:", req.headers.authorization);
+const protect = (req, res, next) => {
+  try {
+    const header = req.headers.authorization;
+    console.log("AUTH HEADER RECEIVED:", header);
 
-        let token = req.headers.authorization;
-        if (token && token.startsWith("Bearer")) {
-            token = token.split(" ")[1];
-        }
-        if (!token) {
-            return res.status(400).json({ status: "fail", message: "Your are not logged in" });
-        }
-        const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
-        req.userId = decodedToken.sub
-        next();
-    } catch (error) {
-        return res.status(401).json({ status: "error", message: "Not Authorized.... Invalid token" });
+    if (!header || !header.toLowerCase().startsWith("bearer ")) {
+      return res.status(401).json({ status: "fail", message: "Not logged in" });
     }
 
-}
+    // Always split safely
+    const token = header.split(" ")[1];
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // The ACTUAL fix:
+    req.userId = decoded.sub || decoded.id || decoded.userId;
+
+    console.log("Decoded userId:", req.userId);
+
+    next();
+  } catch (err) {
+    console.error("JWT ERROR:", err.message);
+    return res.status(401).json({ status: "error", message: "Invalid token" });
+  }
+};
 
 module.exports = { protect };

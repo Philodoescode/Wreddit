@@ -1,3 +1,6 @@
+require('dotenv').config();
+
+
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
@@ -17,8 +20,20 @@ mongoose.connect(MONGO_URI)
 
 // Explicitly configure CORS to allow requests from the client's origin.
 // This must be placed before you register any routes.
+const allowedOrigins = ['http://localhost:5173', 'http://localhost:5174'];
+
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  origin: function (origin, callback) {
+    // allow requests with no origin (like Postman, curl)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true, // if you want to send cookies / auth headers
 }));
 
 app.use(morgan('dev'));

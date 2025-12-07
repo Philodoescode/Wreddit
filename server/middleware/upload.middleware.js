@@ -3,7 +3,10 @@ const path = require('path');
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        let folder
+        console.log("UPLOAD: req.userId =", req.userId); // ADD THIS
+        console.log("UPLOAD ROUTE:", req.originalUrl);
+        console.log("FILE RECEIVED:", file ? file.originalname : "NO FILE");
+        let folder;
 
         if (req.originalUrl.includes("avatar")) {
             folder = "avatars";
@@ -13,10 +16,12 @@ const storage = multer.diskStorage({
             return cb(new Error("Invalid upload route"), false);
         }
 
-        cb(null, path.join(__dirname, "..", "uploads", folder))
-    }, filename: (req, file, cb) => {
+        cb(null, path.join(__dirname, "..", "uploads", folder));
+    },
+    filename: (req, file, cb) => {
+        console.log("UPLOAD: req.userId =", req.userId); // ADD THIS
         const ext = path.extname(file.originalname);
-        let prefix
+        let prefix;
 
         if (req.originalUrl.includes("avatar")) {
             prefix = "user-avatar";
@@ -26,9 +31,10 @@ const storage = multer.diskStorage({
             return cb(new Error("Invalid upload route"), false);
         }
 
-        cb(null, `${prefix}-${req.userId}-${Date.now()}${ext}`)
+        cb(null, `${prefix}-${req.userId}-${Date.now()}${ext}`);
     },
-})
+});
+
 
 
 const fileFilter = (req, file, cb) => {

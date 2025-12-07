@@ -239,34 +239,45 @@ const updateAvatarImage = async (req, res) => {
     }
 }
 
+
 const uploadBannerImage = async (req, res) => {
+    console.log("=== CONTROLLER START ===");
+    console.log("req.userId =", req.userId);
+    console.log("req.file =", req.file);
+    console.log("req.body =", req.body);
+
     try {
         if (!req.file) {
+            console.log("No file found in controller!");
             return res.status(400).json({ status: "fail", message: "No file uploaded" });
         }
+
         const userId = req.userId;
         const user = await User.findById(userId);
 
         if (!user) {
-
-            if (req.file && req.file.path) {
-                fs.unlinkSync(req.file.path);
-            }
-
+            console.log("User not found for id:", userId);
+            if (req.file && req.file.path) fs.unlinkSync(req.file.path);
             return res.status(404).json({ status: "fail", message: "User not found" });
         }
 
+        // Update banner URL
         user.profileBannerUrl = `/uploads/banners/${req.file.filename}`;
         await user.save();
-        res.status(200).json({ status: "success", message: "Profile banner image updated successfully", data: { user: userData(user) } });
+
+        console.log("Banner updated successfully for user:", user.username);
+
+        res.status(200).json({
+            status: "success",
+            message: "Profile banner image updated successfully",
+            data: { user: userData(user) }
+        });
     } catch (error) {
-        if (req.file && req.file.path) {
-            fs.unlinkSync(req.file.path);
-        }
+        console.error("Error updating banner:", error);
+        if (req.file && req.file.path) fs.unlinkSync(req.file.path);
         res.status(500).json({ status: "fail", message: `Error in updating profile banner image: ${error.message}` });
     }
-}
-
+};
 
 
 module.exports = {
