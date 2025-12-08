@@ -1,7 +1,11 @@
 const mongoose = require('mongoose');
 
 const subscriptionSchema = new mongoose.Schema({
-            user: {type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true, required: true},
+            user: {type: mongoose.Schema.Types.ObjectId, 
+                ref: 'User',
+                 index: true, 
+                 required: true},
+                 
             community: {
                 type: mongoose.Schema.Types.ObjectId,
                 ref: 'Community',
