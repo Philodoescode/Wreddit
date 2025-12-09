@@ -44,6 +44,7 @@ app.use('/assets', express.static(path.join(__dirname, 'assets')));
 
 app.use('/api/users', require('./routes/user.routes'));
 app.use('/api/communities', require('./routes/community.routes'));
+app.use('/api/posts', require('./routes/post.routes'));
 
 
 app.get('/', (req, res) => {
