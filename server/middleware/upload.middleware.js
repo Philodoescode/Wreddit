@@ -12,6 +12,8 @@ const storage = multer.diskStorage({
             folder = "avatars";
         } else if (req.originalUrl.includes("banner")) {
             folder = "banners";
+        } else if (req.originalUrl.includes("posts")) {
+            folder = "posts";
         } else {
             return cb(new Error("Invalid upload route"), false);
         }
@@ -27,6 +29,8 @@ const storage = multer.diskStorage({
             prefix = "user-avatar";
         } else if (req.originalUrl.includes("banner")) {
             prefix = "user-banner";
+        } else if (req.originalUrl.includes("posts")) {
+            prefix = "post-media";
         } else {
             return cb(new Error("Invalid upload route"), false);
         }
