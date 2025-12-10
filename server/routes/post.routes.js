@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 
-const { createPost } = require('../controller/post.controller');
+const { createPost, getPosts, getPostById } = require('../controller/post.controller');
 const { protect } = require('../middleware/auth.middleware');
 const { upload, uploadErrorHandler } = require('../middleware/upload.middleware');
 
@@ -14,5 +14,9 @@ router.post(
     createPost,
     uploadErrorHandler
 );
+
+router.get('/', getPosts)
+router.get('/:id', getPostById)
+
 
 module.exports = router;

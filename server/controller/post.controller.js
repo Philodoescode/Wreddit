@@ -9,7 +9,7 @@ const fs = require('fs');
  */
 const cleanupUploadedFiles = (files) => {
     if (!files || files.length === 0) return;
-    
+
     files.forEach(file => {
         try {
             if (fs.existsSync(file.path)) {
@@ -38,13 +38,13 @@ const determinePostType = (hasMedia, hasLink, hasBody) => {
  */
 const createPost = async (req, res) => {
     const files = req.files || [];
-    
+
     try {
         const { title, body, linkUrl, communityName } = req.body;
         const authorId = req.userId;
 
         // ============ Validation ============
-        
+
         // Title is required
         if (!title || !title.trim()) {
             cleanupUploadedFiles(files);
@@ -95,7 +95,7 @@ const createPost = async (req, res) => {
         }
 
         // ============ Community Verification ============
-        
+
         const community = await Community.findOne({ name: communityName.trim() });
         if (!community) {
             cleanupUploadedFiles(files);
@@ -122,10 +122,10 @@ const createPost = async (req, res) => {
         }
 
         // ============ Create Post ============
-        
+
         // Build media URLs from uploaded files
         const mediaUrls = files.map(file => `/uploads/posts/${file.filename}`);
-        
+
         // Determine post type
         const postType = determinePostType(hasMedia, hasLink, hasBody);
 
@@ -155,7 +155,7 @@ const createPost = async (req, res) => {
     } catch (error) {
         // Clean up files on any unexpected error
         cleanupUploadedFiles(files);
-        
+
         console.error('Post creation error:', error);
         res.status(500).json({
             status: 'fail',
@@ -164,6 +164,78 @@ const createPost = async (req, res) => {
     }
 };
 
+// this function will get the posts for the feed where posts are selected based on latest posts from random communities the user is subscribed to...
+// if the user selects a specific community then the community name will be passed as a query param and the posts that will be displayed will be from this community
+const getPosts = async (req, res) => {
+    try {
+        const { community, feed, page = 1, limit = 10 } = req.query;
+        const userId = req.userId;
+
+        const pageNum = Number(page) || 1;
+        const limitNum = Number(limit) || 10;
+
+        let query = {};
+
+        if (feed === 'home') {
+            if (!userId) {
+                // for not logged in users, show latest posts globally
+                query = {};
+            } else {
+                const subs = await Subscription.find({ user: userId }).select('community -_id');
+
+                if (subs.length > 0) {
+                    const communityIds = subs.map(sub => sub.community);
+
+                    const shuffled = communityIds.sort(() => Math.random() - 0.5)
+                    const selectedCommunities = shuffled.slice(0, 10)
+
+                    query.community = { $in: selectedCommunities }
+                }else {
+                    // for users with no subscription , show the latest posts globallly 
+                    query = {};
+                }
+            }
+        }
+
+        if (community) {
+            const comm = await Community.findOne({ name: community });
+            if (!comm) {
+                return res.status(404).json({ status: 'fail', message: 'Community not found' });
+            }
+            query.community = comm._id;
+        }
+
+        let posts = await Post.find(query).sort({ createdAt: -1 }).skip((pageNum - 1) * limitNum).limit(limitNum)
+            .populate('author', 'username userPhotoUrl').populate('community', 'name title iconImage').lean()
+
+        res.status(200).json({ status: 'success', data: posts });
+    } catch (error) {
+        res.status(500).json({ status: 'error', message: error.message })
+    }
+}
+
+const getPostById = async(req, res) => {
+    try {
+        const postId = req.params.id;
+        
+        if(!postId || !mongoose.Types.ObjectId.isValid(postId)){
+            return res.status(400).json({ status: 'fail', message: 'Invalid post ID' });
+        }
+
+        const post = await Post.findById(postId).populate('author', 'username userPhotoUrl')
+                                                .populate('community', 'name title iconImage').lean();
+
+        if(!post){
+            return res.status(404).json({ status: 'fail', message: 'Post not found' });
+        }
+
+        return res.status(200).json({ status: 'success', data: post });
+
+    } catch (error) {
+        return res.status(500).json({ status: 'error', message: error.message })
+    }
+}
+
 module.exports = {
-    createPost
+    createPost, getPosts, getPostById
 };
