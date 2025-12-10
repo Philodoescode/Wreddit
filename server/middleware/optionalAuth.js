@@ -9,7 +9,7 @@ const optionalAuth = (req, res, next) => {
     const token = authHeader.split(" ")[1];
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        req.user = {id: decoded.id};
+        req.user = {id: decoded.sub};
     } catch (error) {
         // Token is invalid or expired, proceed without user
     }
