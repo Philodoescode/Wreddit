@@ -22,6 +22,8 @@ const userSchema = new mongoose.Schema({
     userGold: { type: Number, default: 0 },
     userDate: { type: Date, default: Date.now },
 
+    // used for the search bar to add the recent search features
+    recentSearches: { type: [String], default: [] }
 
 }, { timestamps: true });
 

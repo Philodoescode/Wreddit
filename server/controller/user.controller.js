@@ -29,7 +29,7 @@ const userData = (user) => ({
     userKarma: user.userKarma,
     userContributions: user.userContributions,
     userGold: user.userGold,
-    userAge: calculateDate(user.userDate),
+    userAge: calculateDate(user.userDate)
 })
 
 const calculateDate = (date) => {
