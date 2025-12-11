@@ -80,6 +80,7 @@ export default function SubmitTabs({
     maxFiles: 10,
     maxSize: 100 * 1024 * 1024, // 100MB
     multiple: true,
+    accept: "image/*,video/*", // Accept images and videos
   });
 
   // Validate title

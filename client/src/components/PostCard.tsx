@@ -4,7 +4,7 @@ import {Card, CardContent} from "@/components/ui/card";
 import {Avatar, AvatarFallback, AvatarImage} from "@/components/ui/avatar";
 import {Badge} from "@/components/ui/badge";
 import {Button} from "@/components/ui/button";
-import {formatTimeAgo, getImageUrl} from "@/lib/utils";
+import {formatTimeAgo, getImageUrl, isVideoUrl} from "@/lib/utils";
 import type {Post} from "@/types/post";
 
 interface PostCardProps {
@@ -120,11 +120,22 @@ export default function PostCard({post}: PostCardProps) {
                         {/* Media preview */}
                         {post.mediaUrls && post.mediaUrls.length > 0 && (
                             <div className="mb-3">
-                                <img
-                                    src={getImageUrl(post.mediaUrls[0])}
-                                    alt="Post media"
-                                    className="rounded-md max-h-64 object-cover"
-                                />
+                                {isVideoUrl(post.mediaUrls[0]) ? (
+                                    <video
+                                        src={getImageUrl(post.mediaUrls[0])}
+                                        controls
+                                        className="rounded-md max-h-64 w-full"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        Your browser does not support the video tag.
+                                    </video>
+                                ) : (
+                                    <img
+                                        src={getImageUrl(post.mediaUrls[0])}
+                                        alt="Post media"
+                                        className="rounded-md max-h-64 object-cover"
+                                    />
+                                )}
                                 {post.mediaUrls.length > 1 && (
                                     <Badge variant="secondary" className="mt-2 text-xs">
                                         +{post.mediaUrls.length - 1} more

@@ -32,3 +32,9 @@ export function formatTimeAgo(dateString: string): string {
     return `${Math.floor(seconds / 31536000)}y ago`;
 }
 
+export function isVideoUrl(url: string): boolean {
+    const videoExtensions = ['.mp4', '.webm', '.ogg', '.mov', '.avi', '.wmv', '.flv', '.mkv', '.m4v'];
+    const lowerUrl = url.toLowerCase();
+    return videoExtensions.some(ext => lowerUrl.endsWith(ext));
+}
+

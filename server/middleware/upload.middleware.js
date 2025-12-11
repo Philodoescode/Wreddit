@@ -59,13 +59,15 @@ const upload = multer({storage: storage, fileFilter: fileFilter, limits: { fileS
 //============= error handling middleware for uploads errors ===========
 
 const uploadErrorHandler = (err, req, res, next) => {
-  if (err instanceof multer.MulterError || 
-      err.message === "Only image files are allowed" || 
-      err.message === "Only image and video files are allowed") {
+  if (err instanceof multer.MulterError ||
+      err.message === "Only image files are allowed" ||
+      err.message === "Only image and video files are allowed" ||
+      err.message === "Invalid upload route") {
     return res.status(400).json({ status: "fail", message: err.message });
   }
 
-  next();
+  // Pass other errors to the next error handler
+  next(err);
 };
 
 
