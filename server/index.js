@@ -6,9 +6,24 @@ const cors = require('cors');
 const morgan = require('morgan');
 const mongoose = require('mongoose');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
 const port = process.env.PORT || 5000;
+
+// Ensure upload directories exist
+const uploadDirs = [
+  path.join(__dirname, 'uploads', 'avatars'),
+  path.join(__dirname, 'uploads', 'banners'),
+  path.join(__dirname, 'uploads', 'posts')
+];
+
+uploadDirs.forEach(dir => {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+    console.log(`Created upload directory: ${dir}`);
+  }
+});
 
 // The MONGO_URI is set in docker-compose.yml
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/wreddit';

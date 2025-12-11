@@ -7,7 +7,7 @@ import {Avatar, AvatarFallback, AvatarImage} from "@/components/ui/avatar";
 import {Badge} from "@/components/ui/badge";
 import {Button} from "@/components/ui/button";
 import {Separator} from "@/components/ui/separator";
-import {formatTimeAgo, getImageUrl} from "@/lib/utils";
+import {formatTimeAgo, getImageUrl, isVideoUrl} from "@/lib/utils";
 import type {Post} from "@/types/post";
 import type {ApiError} from "@/types/errors.ts";
 
@@ -130,12 +130,23 @@ export default function PostDetailPage() {
                     {post.mediaUrls && post.mediaUrls.length > 0 && (
                         <div className="mb-4 space-y-4">
                             {post.mediaUrls.map((url, index) => (
-                                <img
-                                    key={index}
-                                    src={getImageUrl(url)}
-                                    alt={`Post media ${index + 1}`}
-                                    className="rounded-md max-w-full"
-                                />
+                                isVideoUrl(url) ? (
+                                    <video
+                                        key={index}
+                                        src={getImageUrl(url)}
+                                        controls
+                                        className="rounded-md max-w-full w-full"
+                                    >
+                                        Your browser does not support the video tag.
+                                    </video>
+                                ) : (
+                                    <img
+                                        key={index}
+                                        src={getImageUrl(url)}
+                                        alt={`Post media ${index + 1}`}
+                                        className="rounded-md max-w-full"
+                                    />
+                                )
                             ))}
                         </div>
                     )}
