@@ -6,7 +6,7 @@ function App() {
   return (
     <ThemeProvider>
       {/* Full-page layout with sticky footer */}
-      <div className="flex flex-col min-h-screen bg-muted/40">
+      <div className="flex flex-col min-h-screen bg-muted/40 overflow-visible">
         <NavBar />
 
         {/* Main grows and centers content */}

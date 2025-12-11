@@ -9,6 +9,8 @@ import { useAuthModal } from "@/context/auth-modal-provider"
 import { useAuth } from "@/context/auth-provider"
 import Notifications from "@/components/notifications"
 import OnlineAvatar from "@/components/online-avatar"
+import SearchBar from "@/components/searchBar";
+
 
 export default function NavBar() {
   const id = useId()
@@ -31,24 +33,7 @@ export default function NavBar() {
 
         {/* Middle area */}
         <div className="grow max-sm:hidden">
-          <div className="relative mx-auto w-full max-w-xs">
-            <Input
-              id={id}
-              className="peer h-8 px-8"
-              placeholder="Search..."
-              type="search"
-            />
-            <div className="pointer-events-none absolute inset-y-0 start-0 flex items-center justify-center ps-2 text-muted-foreground/80 peer-disabled:opacity-50">
-              <SearchIcon size={16} />
-            </div>
-            <button
-              className="absolute inset-y-0 end-0 flex h-full w-9 items-center justify-center rounded-e-md text-muted-foreground/80 transition-[color,box-shadow] outline-none hover:text-foreground focus:z-10 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50"
-              aria-label="Press to speak"
-              type="submit"
-            >
-              <MicIcon size={16} aria-hidden="true" />
-            </button>
-          </div>
+          <SearchBar />
         </div>
 
         {/* Right side */}
