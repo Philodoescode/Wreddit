@@ -54,7 +54,7 @@ const fileFilter = (req, file, cb) => {
 // upload function will be used with two types.... upload.single (when the user is only allowed to upload a single file)
 //                                                 upload.array  (when the user is allowed to upload multiple files at once when posting)
 
-const upload = multer({storage: storage, fileFilter: fileFilter, limits: { fileSize: 3 * 1024 * 1024 }})
+const upload = multer({storage: storage, fileFilter: fileFilter, limits: { fileSize: 100 * 1024 * 1024 }}) // 100MB limit for video support
 
 //============= error handling middleware for uploads errors ===========
 
