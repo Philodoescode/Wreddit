@@ -1,5 +1,5 @@
 import { useId } from "react"
-import { MicIcon, SearchIcon } from "lucide-react"
+import { MicIcon, PlusIcon, SearchIcon } from "lucide-react"
 import { Link } from "react-router-dom"; // Add this import
 
 import ThemeToggle from "@/components/theme-toggle"
@@ -41,6 +41,11 @@ export default function NavBar() {
           {isAuthenticated ? (
             // Logged In: Show Create Community, Notifications, and Avatar
             <div className="flex items-center gap-3">
+              <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground" asChild>
+                <Link to="/submit" aria-label="Create post">
+                  <PlusIcon className="h-5 w-5" />
+                </Link>
+              </Button>
               <Button variant="outline" size="sm" asChild>
                 <Link to="/create-community">Create Community</Link>
               </Button>
