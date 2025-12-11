@@ -42,11 +42,12 @@ const storage = multer.diskStorage({
 
 
 const fileFilter = (req, file, cb) => {
-    const imageType = file.mimetype.split("/")[0];
-    if(imageType === "image"){
+    const fileType = file.mimetype.split("/")[0];
+    // Allow both images and videos for post media uploads
+    if(fileType === "image" || fileType === "video"){
         return cb(null, true);
     }
-    cb(new Error("Only image files are allowed"), false);
+    cb(new Error("Only image and video files are allowed"), false);
 }
 
 // ============= upload function used in routing when uploading images =============
@@ -58,7 +59,9 @@ const upload = multer({storage: storage, fileFilter: fileFilter, limits: { fileS
 //============= error handling middleware for uploads errors ===========
 
 const uploadErrorHandler = (err, req, res, next) => {
-  if (err instanceof multer.MulterError || err.message === "Only image files are allowed") {
+  if (err instanceof multer.MulterError || 
+      err.message === "Only image files are allowed" || 
+      err.message === "Only image and video files are allowed") {
     return res.status(400).json({ status: "fail", message: err.message });
   }
 
