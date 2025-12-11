@@ -1,6 +1,7 @@
 const Post = require('../model/post.model');
 const Community = require('../model/community.model');
 const Subscription = require('../model/subscription.model');
+const mongoose = require('mongoose');
 const fs = require('fs');
 
 /**
