@@ -1,6 +1,5 @@
 # Wreddit
 Open-source, full-stack clone of the popular community aggregation platform, designed to explore modern web technologies while fostering a vibrant, slightly self-aware community. We're here to see what you've wrote and maybe, just maybe, judge it slightly.
-Of course. Here is a clear and concise `README.md` file that you can place in the root of your "Wreddit" project. It will guide other developers on how to set up and run the application in their local development environment using Docker.
 
 ## Prerequisites
 
