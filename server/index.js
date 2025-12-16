@@ -60,9 +60,13 @@ app.use('/assets', express.static(path.join(__dirname, 'assets')));
 app.use('/api/users', require('./routes/user.routes'));
 app.use('/api/communities', require('./routes/community.routes'));
 app.use('/api/posts', require('./routes/post.routes'));
-app.use("/api/search", require("./routes/search.routes"));
 
+// Mount comment routes under /api/posts for the GET endpoint
+// and also make the POST available at /api/comments
+app.use('/api/posts', require('./routes/comment.routes'));
+app.use('/api/comments', require('./routes/comment.routes')); // Keep this too
 
+app.use('/api/search', require('./routes/search.routes'));
 
 app.get('/', (req, res) => {
   res.send('Hello from the Wreddit server! MongoDB connection initiated.');
