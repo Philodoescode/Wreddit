@@ -9,6 +9,8 @@ export function usePostSummary(postId: string) {
         error: null,
     });
     const [fromCache, setFromCache] = useState<boolean>(false);
+    const [includesComments, setIncludesComments] = useState<boolean>(false);
+    const [commentsAnalyzed, setCommentsAnalyzed] = useState<number>(0);
     const [initialLoading, setInitialLoading] = useState<boolean>(true);
 
     const getErrorMessage = (error: any): { message: string; type: SummaryErrorType } => {
@@ -74,6 +76,8 @@ export function usePostSummary(postId: string) {
                         error: null,
                     });
                     setFromCache(true);
+                    setIncludesComments(response.data.data.includesComments ?? false);
+                    setCommentsAnalyzed(response.data.data.commentsAnalyzed ?? 0);
                 }
             } catch {
                 // 404 means no summary exists yet - that's fine, just show the generate button
@@ -103,6 +107,8 @@ export function usePostSummary(postId: string) {
                     error: null,
                 });
                 setFromCache(response.data.data.fromCache ?? false);
+                setIncludesComments(response.data.data.includesComments ?? false);
+                setCommentsAnalyzed(response.data.data.commentsAnalyzed ?? 0);
             }
 
         } catch (error: any) {
@@ -125,6 +131,8 @@ export function usePostSummary(postId: string) {
             error: null,
         });
         setFromCache(false);
+        setIncludesComments(false);
+        setCommentsAnalyzed(0);
     }, []);
 
     const retry = useCallback(async () => {
@@ -145,6 +153,8 @@ export function usePostSummary(postId: string) {
                     error: null,
                 });
                 setFromCache(false);
+                setIncludesComments(response.data.data.includesComments ?? false);
+                setCommentsAnalyzed(response.data.data.commentsAnalyzed ?? 0);
             }
 
         } catch (error: any) {
@@ -160,6 +170,8 @@ export function usePostSummary(postId: string) {
     return {
         ...state,
         fromCache,
+        includesComments,
+        commentsAnalyzed,
         initialLoading,
         generateSummary,
         clearSummary,

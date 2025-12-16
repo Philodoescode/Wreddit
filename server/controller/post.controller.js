@@ -1,6 +1,7 @@
 const Post = require('../model/post.model');
 const Community = require('../model/community.model');
 const Subscription = require('../model/subscription.model');
+const Comment = require('../model/comment.model');
 const mongoose = require('mongoose');
 const fs = require('fs');
 const { GoogleGenAI } = require('@google/genai');
@@ -282,7 +283,9 @@ const getSummary = async (req, res) => {
                 summary: post.aiSummary.text,
                 postId: postId,
                 generatedAt: post.aiSummary.generatedAt?.toISOString() || null,
-                fromCache: true
+                fromCache: true,
+                includesComments: post.aiSummary.includesComments || false,
+                commentsAnalyzed: post.aiSummary.commentsAnalyzed || 0
             }
         });
     } catch (error) {
@@ -292,6 +295,48 @@ const getSummary = async (req, res) => {
             message: 'Failed to fetch summary'
         });
     }
+};
+
+/**
+ * Smart comment sampling strategy for AI summary
+ * Selects a diverse set of comments to analyze crowd reactions
+ * @param {Array} comments - All comments for the post
+ * @param {Number} maxComments - Maximum number of comments to include (default: 15)
+ * @returns {Array} - Sampled comments
+ */
+const sampleCommentsForSummary = (comments, maxComments = 15) => {
+    if (!comments || comments.length === 0) return [];
+
+    // Filter to only top-level comments (no nested replies)
+    const topLevelComments = comments.filter(c => !c.parentId);
+
+    if (topLevelComments.length <= maxComments) {
+        return topLevelComments;
+    }
+
+    // Sort by createdAt to get chronological order
+    const sortedComments = [...topLevelComments].sort((a, b) =>
+        new Date(a.createdAt) - new Date(b.createdAt)
+    );
+
+    // Strategy: Take a mix of early, middle, and recent comments
+    // This captures evolving sentiment and diverse perspectives
+    const sampled = [];
+    const step = Math.floor(sortedComments.length / maxComments);
+
+    for (let i = 0; i < maxComments && i * step < sortedComments.length; i++) {
+        const index = i * step;
+        const comment = sortedComments[index];
+
+        // Truncate very long comments to save tokens (max 500 chars)
+        if (comment.content && comment.content.length > 500) {
+            comment.content = comment.content.substring(0, 497) + '...';
+        }
+
+        sampled.push(comment);
+    }
+
+    return sampled;
 };
 
 /**
@@ -333,7 +378,9 @@ const summarizePost = async (req, res) => {
                     summary: post.aiSummary.text,
                     postId: post._id,
                     generatedAt: post.aiSummary.generatedAt?.toISOString() || null,
-                    fromCache: true
+                    fromCache: true,
+                    includesComments: post.aiSummary.includesComments || false,
+                    commentsAnalyzed: post.aiSummary.commentsAnalyzed || 0
                 }
             });
         }
@@ -356,21 +403,65 @@ const summarizePost = async (req, res) => {
             });
         }
 
-        // Prepare the prompt
-        const prompt = `You are a helpful assistant that summarizes Reddit posts. Please provide a concise, informative summary of the following post.
+        // Fetch and sample comments if available
+        let sampledComments = [];
+        let includesComments = false;
+        let commentsAnalyzed = 0;
+
+        if (post.commentCount > 0) {
+            try {
+                // Fetch all comments for this post
+                const allComments = await Comment.find({ postId: post._id })
+                    .sort({ createdAt: 1 })
+                    .populate('userId', 'username')
+                    .lean();
+
+                // Sample comments using smart strategy
+                sampledComments = sampleCommentsForSummary(allComments, 15);
+                includesComments = sampledComments.length > 0;
+                commentsAnalyzed = sampledComments.length;
+
+                console.log(`Sampled ${commentsAnalyzed} comments out of ${allComments.length} total for post ${postId}`);
+            } catch (commentError) {
+                console.error('Error fetching comments for summary:', commentError);
+                // Continue without comments if there's an error
+            }
+        }
+
+        // Prepare the prompt with or without comments
+        let prompt = `You are a helpful assistant that summarizes Reddit posts. Please provide a concise, informative summary of the following post.
 
 Title: ${post.title}
 
 Content:
-${contentToSummarize}
+${contentToSummarize}`;
 
-Please provide a summary that:
+        // Add comments section if available
+        if (includesComments && sampledComments.length > 0) {
+            prompt += `\n\n--- Community Comments (${commentsAnalyzed} sampled) ---\n`;
+            sampledComments.forEach((comment, index) => {
+                const username = comment.userId?.username || 'Anonymous';
+                prompt += `\nComment ${index + 1} by ${username}:\n${comment.content}\n`;
+            });
+
+            prompt += `\n\nPlease provide a summary that:
+1. Captures the main points and key information from the post
+2. Summarizes the overall crowd reaction and sentiment from the comments
+3. Highlights key themes, perspectives, or debates in the comment section
+4. Notes any interesting consensus or disagreements among commenters
+5. Is concise (3-5 sentences total)
+6. Is objective and neutral in tone
+
+Summary:`;
+        } else {
+            prompt += `\n\nPlease provide a summary that:
 1. Captures the main points and key information
 2. Is concise (2-4 sentences)
 3. Is objective and neutral in tone
 4. Highlights any important details or conclusions
 
 Summary:`;
+        }
 
         const config = {
             thinkingConfig: {
@@ -418,7 +509,9 @@ Summary:`;
         // Save summary to the post document
         post.aiSummary = {
             text: trimmedSummary,
-            generatedAt: generatedAt
+            generatedAt: generatedAt,
+            includesComments: includesComments,
+            commentsAnalyzed: commentsAnalyzed
         };
         await post.save();
 
@@ -429,7 +522,9 @@ Summary:`;
                 summary: trimmedSummary,
                 postId: post._id,
                 generatedAt: generatedAt.toISOString(),
-                fromCache: false
+                fromCache: false,
+                includesComments: includesComments,
+                commentsAnalyzed: commentsAnalyzed
             }
         });
 

@@ -90,6 +90,14 @@ const postSchema = new mongoose.Schema({
             type: Date,
             default: null,
         },
+        includesComments: {
+            type: Boolean,
+            default: false,
+        },
+        commentsAnalyzed: {
+            type: Number,
+            default: 0,
+        },
     },
 }, {
     timestamps: true,

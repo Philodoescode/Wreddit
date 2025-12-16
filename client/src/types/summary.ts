@@ -5,6 +5,8 @@ export interface SummaryResponse {
         postId: string;
         generatedAt: string;
         fromCache?: boolean;
+        includesComments?: boolean;
+        commentsAnalyzed?: number;
     };
     message?: string;
 }
