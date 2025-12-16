@@ -39,7 +39,7 @@ export default function AiSummary({ postId }: AiSummaryProps) {
                 <Collapsible title="AI Summary" defaultOpen={true}>
                     <div className="space-y-3">
                         <div className="flex items-start gap-3 text-destructive">
-                            <AlertCircle className="h-5 w-5 mt-0.5 flex-shrink-0" />
+                            <AlertCircle className="h-5 w-5 mt-0.5 shrink-0" />
                             <div className="flex-1">
                                 <p className="text-sm font-medium">Failed to generate summary</p>
                                 <p className="text-sm text-muted-foreground mt-1">{error}</p>
@@ -85,7 +85,7 @@ export default function AiSummary({ postId }: AiSummaryProps) {
                 <Collapsible title="AI Summary" defaultOpen={true}>
                     <div className="space-y-3">
                         <div className="flex items-start gap-3">
-                            <Sparkles className="h-5 w-5 mt-0.5 flex-shrink-0 text-primary" />
+                            <Sparkles className="h-5 w-5 mt-0.5 shrink-0 text-primary" />
                             <div className="flex-1">
                                 <p className="text-sm leading-relaxed whitespace-pre-wrap">
                                     {summary}

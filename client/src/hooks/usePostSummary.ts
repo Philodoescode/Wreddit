@@ -1,6 +1,6 @@
-import { useState, useCallback, useEffect } from 'react';
+import {useState, useCallback, useEffect} from 'react';
 import api from '@/lib/api';
-import type { SummaryResponse, SummaryState, SummaryErrorType } from '@/types/summary';
+import type {SummaryResponse, SummaryState, SummaryErrorType} from '@/types/summary';
 
 export function usePostSummary(postId: string) {
     const [state, setState] = useState<SummaryState>({
@@ -106,7 +106,7 @@ export function usePostSummary(postId: string) {
             }
 
         } catch (error: any) {
-            const { message, type } = getErrorMessage(error);
+            const {message, type} = getErrorMessage(error);
 
             setState({
                 summary: null,
@@ -114,7 +114,7 @@ export function usePostSummary(postId: string) {
                 error: message,
             });
 
-            console.error('Summary generation error:', { type, error });
+            console.error('Summary generation error:', {type, error});
         }
     }, [postId]);
 
@@ -148,7 +148,7 @@ export function usePostSummary(postId: string) {
             }
 
         } catch (error: any) {
-            const { message } = getErrorMessage(error);
+            const {message} = getErrorMessage(error);
             setState({
                 summary: null,
                 loading: false,
