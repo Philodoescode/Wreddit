@@ -3,6 +3,11 @@ const Community = require('../model/community.model');
 const Subscription = require('../model/subscription.model');
 const mongoose = require('mongoose');
 const fs = require('fs');
+const { GoogleGenAI } = require('@google/genai');
+
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+const model = 'gemini-2.5-flash';
 
 /**
  * Helper function to clean up uploaded files on error
@@ -191,7 +196,7 @@ const getPosts = async (req, res) => {
                     const selectedCommunities = shuffled.slice(0, 10)
 
                     query.community = { $in: selectedCommunities }
-                }else {
+                } else {
                     // for users with no subscription , show the latest posts globallly 
                     query = {};
                 }
@@ -215,18 +220,18 @@ const getPosts = async (req, res) => {
     }
 }
 
-const getPostById = async(req, res) => {
+const getPostById = async (req, res) => {
     try {
         const postId = req.params.id;
-        
-        if(!postId || !mongoose.Types.ObjectId.isValid(postId)){
+
+        if (!postId || !mongoose.Types.ObjectId.isValid(postId)) {
             return res.status(400).json({ status: 'fail', message: 'Invalid post ID' });
         }
 
         const post = await Post.findById(postId).populate('author', 'username userPhotoUrl')
-                                                .populate('community', 'name title iconImage').lean();
+            .populate('community', 'name title iconImage').lean();
 
-        if(!post){
+        if (!post) {
             return res.status(404).json({ status: 'fail', message: 'Post not found' });
         }
 
@@ -237,6 +242,231 @@ const getPostById = async(req, res) => {
     }
 }
 
-module.exports = {
-    createPost, getPosts, getPostById
+/**
+ * Get existing AI summary for a post (without generating)
+ * GET /api/posts/:id/summary
+ */
+const getSummary = async (req, res) => {
+    try {
+        const postId = req.params.id;
+
+        // Validate post ID
+        if (!postId || !mongoose.Types.ObjectId.isValid(postId)) {
+            return res.status(400).json({
+                status: 'fail',
+                message: 'Invalid post ID'
+            });
+        }
+
+        // Fetch the post
+        const post = await Post.findById(postId).select('aiSummary').lean();
+
+        if (!post) {
+            return res.status(404).json({
+                status: 'fail',
+                message: 'Post not found'
+            });
+        }
+
+        // Check if summary exists
+        if (!post.aiSummary?.text) {
+            return res.status(404).json({
+                status: 'fail',
+                message: 'No summary found for this post'
+            });
+        }
+
+        res.status(200).json({
+            status: 'success',
+            data: {
+                summary: post.aiSummary.text,
+                postId: postId,
+                generatedAt: post.aiSummary.generatedAt?.toISOString() || null,
+                fromCache: true
+            }
+        });
+    } catch (error) {
+        console.error('Get summary error:', error);
+        res.status(500).json({
+            status: 'fail',
+            message: 'Failed to fetch summary'
+        });
+    }
 };
+
+/**
+ * Generate AI summary for a post
+ * POST /api/posts/:id/summarize
+ * Query params:
+ *   - regenerate=true: Force regeneration of summary even if one exists
+ */
+const summarizePost = async (req, res) => {
+    try {
+        const postId = req.params.id;
+        const regenerate = req.query.regenerate === 'true';
+
+        // Validate post ID
+        if (!postId || !mongoose.Types.ObjectId.isValid(postId)) {
+            return res.status(400).json({
+                status: 'fail',
+                message: 'Invalid post ID'
+            });
+        }
+
+        // Fetch the post (not lean, we need to save it)
+        const post = await Post.findById(postId)
+            .populate('author', 'username')
+            .populate('community', 'name');
+
+        if (!post) {
+            return res.status(404).json({
+                status: 'fail',
+                message: 'Post not found'
+            });
+        }
+
+        // Check if summary already exists (unless regenerating)
+        if (!regenerate && post.aiSummary?.text) {
+            return res.status(200).json({
+                status: 'success',
+                data: {
+                    summary: post.aiSummary.text,
+                    postId: post._id,
+                    generatedAt: post.aiSummary.generatedAt?.toISOString() || null,
+                    fromCache: true
+                }
+            });
+        }
+
+        // Check if there's content to summarize
+        const contentToSummarize = post.body?.trim();
+        if (!contentToSummarize || contentToSummarize.length < 50) {
+            return res.status(400).json({
+                status: 'fail',
+                message: 'Post content is too short to summarize (minimum 50 characters)'
+            });
+        }
+
+        // Initialize Google GenAI
+        if (!GEMINI_API_KEY) {
+            console.error('GEMINI_API_KEY is not configured');
+            return res.status(500).json({
+                status: 'fail',
+                message: 'AI service is not configured'
+            });
+        }
+
+        // Prepare the prompt
+        const prompt = `You are a helpful assistant that summarizes Reddit posts. Please provide a concise, informative summary of the following post.
+
+Title: ${post.title}
+
+Content:
+${contentToSummarize}
+
+Please provide a summary that:
+1. Captures the main points and key information
+2. Is concise (2-4 sentences)
+3. Is objective and neutral in tone
+4. Highlights any important details or conclusions
+
+Summary:`;
+
+        const config = {
+            thinkingConfig: {
+                thinkingBudget: 0,
+            },
+        };
+
+        const contents = [
+            {
+                role: 'user',
+                parts: [
+                    {
+                        text: prompt,
+                    },
+                ],
+            },
+        ];
+
+        // Generate summary with timeout
+        const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Request timeout')), 30000); // 30 second timeout
+        });
+
+        const summaryPromise = (async () => {
+            const response = await ai.models.generateContent({
+                model,
+                config,
+                contents,
+            });
+
+            // Extract the summary text
+            const summary = response.text || '';
+
+            if (!summary) {
+                throw new Error('No summary generated');
+            }
+
+            return summary;
+        })();
+
+        const summary = await Promise.race([summaryPromise, timeoutPromise]);
+        const trimmedSummary = summary.trim();
+        const generatedAt = new Date();
+
+        // Save summary to the post document
+        post.aiSummary = {
+            text: trimmedSummary,
+            generatedAt: generatedAt
+        };
+        await post.save();
+
+        // Return the summary
+        res.status(200).json({
+            status: 'success',
+            data: {
+                summary: trimmedSummary,
+                postId: post._id,
+                generatedAt: generatedAt.toISOString(),
+                fromCache: false
+            }
+        });
+
+    } catch (error) {
+        console.error('AI summarization error:', error);
+
+        // Handle specific error types
+        if (error.message === 'Request timeout') {
+            return res.status(504).json({
+                status: 'fail',
+                message: 'AI service timeout. Please try again.'
+            });
+        }
+
+        if (error.message?.includes('API key')) {
+            return res.status(500).json({
+                status: 'fail',
+                message: 'AI service configuration error'
+            });
+        }
+
+        if (error.message?.includes('quota') || error.message?.includes('rate limit')) {
+            return res.status(429).json({
+                status: 'fail',
+                message: 'AI service rate limit reached. Please try again later.'
+            });
+        }
+
+        // Generic error response
+        res.status(500).json({
+            status: 'fail',
+            message: 'Failed to generate summary. Please try again.'
+        });
+    }
+};
+
+module.exports = {
+    createPost, getPosts, getPostById, summarizePost, getSummary
+};
+
