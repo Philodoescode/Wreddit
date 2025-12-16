@@ -6,6 +6,7 @@
 const { WebSocketServer } = require("ws");
 const { extractToken, verifyToken } = require("./wsAuth");
 const { addClient, removeClient } = require("./connectedClients");
+const { handleMessage } = require("./messageHandler");
 
 /**
  * Initialize WebSocket server and attach to HTTP server
@@ -44,6 +45,11 @@ const initWebSocket = (httpServer) => {
     // Register client in the connected clients map
     addClient(userId, ws);
     console.log(`User ${userId} connected.`);
+
+    // Handle incoming messages
+    ws.on("message", (data) => {
+      handleMessage(ws, data);
+    });
 
     // Handle client disconnection
     ws.on("close", () => {
