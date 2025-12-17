@@ -3,6 +3,7 @@ const router = express.Router();
 
 const { createPost, getPosts, getPostById } = require('../controller/post.controller');
 const { protect } = require('../middleware/auth.middleware');
+const optionalAuth = require('../middleware/optionalAuth');
 const { upload, uploadErrorHandler } = require('../middleware/upload.middleware');
 
 // POST /api/posts - Create a new post
@@ -15,8 +16,8 @@ router.post(
     uploadErrorHandler
 );
 
-router.get('/', getPosts)
-router.get('/:id', getPostById)
+router.get('/', optionalAuth, getPosts)
+router.get('/:id', optionalAuth, getPostById)
 
 
 module.exports = router;
