@@ -11,7 +11,8 @@ import {formatTimeAgo, getImageUrl, isVideoUrl} from "@/lib/utils";
 import CommentSection from "@/components/commentSection";
 
 import type {Post} from "@/types/post";
-import type {ApiError} from "@/types/errors";
+import type {ApiError} from "@/types/errors.ts";
+import AiSummary from "@/components/AiSummary";
 
 export default function PostDetailPage() {
     const {id} = useParams<{ id: string }>();
@@ -173,6 +174,11 @@ export default function PostDetailPage() {
                                 )
                             )}
                         </div>
+                    )}
+
+                    {/* AI Summary */}
+                    {post.body && post.body.trim().length >= 50 && (
+                        <AiSummary postId={post._id} />
                     )}
 
                     <Separator className="my-4"/>

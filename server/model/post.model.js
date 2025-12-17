@@ -80,6 +80,25 @@ const postSchema = new mongoose.Schema({
         type: Number,
         default: 0,
     },
+    // AI-generated summary stored directly on the post
+    aiSummary: {
+        text: {
+            type: String,
+            default: null,
+        },
+        generatedAt: {
+            type: Date,
+            default: null,
+        },
+        includesComments: {
+            type: Boolean,
+            default: false,
+        },
+        commentsAnalyzed: {
+            type: Number,
+            default: 0,
+        },
+    },
 }, {
     timestamps: true,
 });
