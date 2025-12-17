@@ -8,6 +8,8 @@ import {Badge} from "@/components/ui/badge";
 import {Button} from "@/components/ui/button";
 import {Separator} from "@/components/ui/separator";
 import {formatTimeAgo, getImageUrl, isVideoUrl} from "@/lib/utils";
+import CommentSection from "@/components/commentSection";
+
 import type {Post} from "@/types/post";
 import type {ApiError} from "@/types/errors.ts";
 
@@ -185,10 +187,10 @@ export default function PostDetailPage() {
 
             {/* Comments section placeholder */}
             <Card className="mt-4">
-                <CardContent className="p-6 text-center text-muted-foreground">
-                    <p>Comments section coming soon...</p>
+                <CardContent className="p-6">
+                    <CommentSection postId={post._id} />
                 </CardContent>
-            </Card>
+                </Card>
         </div>
     );
 }
