@@ -1,12 +1,13 @@
 import { Link } from "react-router-dom";
 import { ArrowBigDown, ArrowBigUp, MessageSquare } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import api from "@/lib/api";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatTimeAgo, getImageUrl, isVideoUrl } from "@/lib/utils";
 import type { Post } from "@/types/post";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 interface PostCardProps {
   post: Post;
@@ -16,11 +17,23 @@ export default function PostCard({ post }: PostCardProps) {
   // ✅ Initialize from backend
   const [userVote, setUserVote] = useState<1 | -1 | null>(post.currentUserVote ?? null);
   const [upvotes, setUpvotes] = useState(post.upvotes);
+
   const [downvotes, setDownvotes] = useState(post.downvotes);
+  const [isVoting, setIsVoting] = useState(false);
+
+  // Sync state with props when data changes
+  useEffect(() => {
+    setUserVote(post.currentUserVote ?? null);
+    setUpvotes(post.upvotes);
+    setDownvotes(post.downvotes);
+  }, [post]);
 
   const netVotes = upvotes - downvotes;
 
   const handleVote = async (value: 1 | -1) => {
+    if (isVoting) return; // Prevent double voting
+    setIsVoting(true);
+
     const prevUp = upvotes;
     const prevDown = downvotes;
     const prevVote = userVote;
@@ -51,22 +64,15 @@ export default function PostCard({ post }: PostCardProps) {
     setUserVote(newUserVote);
 
     try {
-      const res = await fetch("/api/vote", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-        body: JSON.stringify({ postId: post._id, value }),
-      });
-
-      if (!res.ok) throw new Error("Vote failed");
+      await api.post("/vote", { postId: post._id, value });
     } catch (err) {
       console.error("Vote failed", err);
       // Rollback on error
       setUpvotes(prevUp);
       setDownvotes(prevDown);
       setUserVote(prevVote);
+    } finally {
+      setIsVoting(false);
     }
   };
 

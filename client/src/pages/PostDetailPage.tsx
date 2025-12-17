@@ -20,6 +20,7 @@ export default function PostDetailPage() {
   const [userVote, setUserVote] = useState<1 | -1 | null>(null);
   const [upvotes, setUpvotes] = useState(0);
   const [downvotes, setDownvotes] = useState(0);
+  const [isVoting, setIsVoting] = useState(false);
 
   const fetchPost = useCallback(async () => {
     try {
@@ -69,43 +70,48 @@ export default function PostDetailPage() {
   const netVotes = upvotes - downvotes;
 
   const handleVote = async (value: 1 | -1) => {
-  const prevUp = upvotes;
-  const prevDown = downvotes;
-  const prevVote = userVote;
+    if (isVoting) return;
+    setIsVoting(true);
 
-  let newUserVote: 1 | -1 | null = value;
+    const prevUp = upvotes;
+    const prevDown = downvotes;
+    const prevVote = userVote;
 
-  if (userVote === value) {
-    if (value === 1) setUpvotes(v => v - 1);
-    else setDownvotes(v => v - 1);
-    newUserVote = null;
-  } else if (userVote === -value) {
-    if (value === 1) {
-      setUpvotes(v => v + 1);
-      setDownvotes(v => v - 1);
+    let newUserVote: 1 | -1 | null = value;
+
+    if (userVote === value) {
+      if (value === 1) setUpvotes(v => v - 1);
+      else setDownvotes(v => v - 1);
+      newUserVote = null;
+    } else if (userVote === -value) {
+      if (value === 1) {
+        setUpvotes(v => v + 1);
+        setDownvotes(v => v - 1);
+      } else {
+        setDownvotes(v => v + 1);
+        setUpvotes(v => v - 1);
+      }
     } else {
-      setDownvotes(v => v + 1);
-      setUpvotes(v => v - 1);
+      if (value === 1) setUpvotes(v => v + 1);
+      else setDownvotes(v => v + 1);
     }
-  } else {
-    if (value === 1) setUpvotes(v => v + 1);
-    else setDownvotes(v => v + 1);
-  }
 
-  setUserVote(newUserVote);
+    setUserVote(newUserVote);
 
-  try {
-    await api.post("/vote", {
-      postId: post._id,
-      value,
-    });
-  } catch (err) {
-    console.error("Vote failed", err);
-    setUpvotes(prevUp);
-    setDownvotes(prevDown);
-    setUserVote(prevVote);
-  }
-};
+    try {
+      await api.post("/vote", {
+        postId: post._id,
+        value,
+      });
+    } catch (err) {
+      console.error("Vote failed", err);
+      setUpvotes(prevUp);
+      setDownvotes(prevDown);
+      setUserVote(prevVote);
+    } finally {
+      setIsVoting(false);
+    }
+  };
 
   const arrowClass = (v: 1 | -1) =>
     userVote === v ? (v === 1 ? "text-orange-500" : "text-purple-500") : "";
@@ -169,11 +175,11 @@ export default function PostDetailPage() {
 
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 bg-muted rounded-full px-2 py-1">
-              <Button variant="ghost" size="icon" className={arrowClass(1)} onClick={() => handleVote(1)}>
+              <Button variant="ghost" size="icon" className={`${arrowClass(1)} hover:text-orange-500 hover:bg-orange-500/10 transition-colors`} onClick={() => handleVote(1)}>
                 <ArrowBigUp />
               </Button>
               <span className="font-semibold">{netVotes}</span>
-              <Button variant="ghost" size="icon" className={arrowClass(-1)} onClick={() => handleVote(-1)}>
+              <Button variant="ghost" size="icon" className={`${arrowClass(-1)} hover:text-purple-500 hover:bg-purple-500/10 transition-colors`} onClick={() => handleVote(-1)}>
                 <ArrowBigDown />
               </Button>
             </div>
