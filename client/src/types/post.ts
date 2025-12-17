@@ -21,5 +21,6 @@ export interface Post {
     commentCount: number;
     createdAt: string;
     updatedAt: string;
+    currentUserVote?: 1 | -1 | null;
 }
 
