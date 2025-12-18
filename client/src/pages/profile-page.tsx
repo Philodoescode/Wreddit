@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
-import { StarIcon, TrophyIcon, CakeIcon, Pencil, Loader2 } from "lucide-react";
+import { useParams, useNavigate } from "react-router-dom";
+import { StarIcon, TrophyIcon, CakeIcon, Pencil, Loader2, MessageCircle } from "lucide-react";
 
 import api from "@/lib/api";
 import { getImageUrl } from "@/lib/utils";
@@ -45,6 +45,7 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
 
   const isOwnProfile = currentUser?.username === username;
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -201,10 +202,20 @@ const handleBannerChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
                   <p className="text-lg text-muted-foreground">u/{user.username}</p>
                 </div>
 
-                {isOwnProfile && (
+                {isOwnProfile ? (
                   <Button onClick={() => setEditing(true)} size="sm" className="gap-2">
                     <Pencil className="w-4 h-4" />
                     Edit Profile
+                  </Button>
+                ) : currentUser && (
+                  <Button 
+                    onClick={() => navigate(`/chat?newChat=${user.id}`)}
+                    variant="outline"
+                    size="sm" 
+                    className="gap-2"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    Chat
                   </Button>
                 )}
               </div>
