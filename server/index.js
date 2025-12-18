@@ -36,7 +36,7 @@ mongoose.connect(MONGO_URI)
 
 // Explicitly configure CORS to allow requests from the client's origin.
 // This must be placed before you register any routes.
-const allowedOrigins = ['http://localhost:5173', 'http://localhost:5174'];
+const allowedOrigins = ['http://localhost:5173', 'http://localhost:5174', 'https://wreddit-client.onrender.com'];
 
 app.use(cors({
   origin: function (origin, callback) {
