@@ -9,9 +9,10 @@ interface ChatWindowProps {
   conversation: Conversation | null;
   currentUserId: string;
   isOnline?: boolean;
+  onConversationResolved?: (pendingId: string, realId: string) => void;
 }
 
-export function ChatWindow({ conversation, currentUserId, isOnline = false }: ChatWindowProps) {
+export function ChatWindow({ conversation, currentUserId, isOnline = false, onConversationResolved }: ChatWindowProps) {
   const { sendMessage, isConnected } = useChat();
 
   // Empty state when no conversation selected
@@ -71,6 +72,7 @@ export function ChatWindow({ conversation, currentUserId, isOnline = false }: Ch
       <MessageFeed
         conversationId={conversation._id}
         recipientId={otherParticipant._id}
+        onConversationResolved={onConversationResolved}
       />
 
       {/* Message input */}

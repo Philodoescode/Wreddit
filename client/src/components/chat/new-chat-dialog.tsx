@@ -23,7 +23,7 @@ import type { UserSearchResult } from "@/types/chat.types";
 
 interface NewChatDialogProps {
   onlineUsers: Map<string, boolean>;
-  onUserSelect: (userId: string) => void;
+  onUserSelect: (user: UserSearchResult) => void;
 }
 
 export function NewChatDialog({ onlineUsers, onUserSelect }: NewChatDialogProps) {
@@ -54,8 +54,8 @@ export function NewChatDialog({ onlineUsers, onUserSelect }: NewChatDialogProps)
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const handleUserSelect = (userId: string) => {
-    onUserSelect(userId);
+  const handleUserSelect = (user: UserSearchResult) => {
+    onUserSelect(user);
     setOpen(false);
     setSearchQuery("");
     setSearchResults([]);
@@ -93,7 +93,7 @@ export function NewChatDialog({ onlineUsers, onUserSelect }: NewChatDialogProps)
                   <CommandItem
                     key={user._id}
                     value={user.username}
-                    onSelect={() => handleUserSelect(user._id)}
+                    onSelect={() => handleUserSelect(user)}
                     className="flex items-center gap-3 p-2 cursor-pointer"
                   >
                     <OnlineAvatar

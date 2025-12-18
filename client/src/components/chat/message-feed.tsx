@@ -14,6 +14,7 @@ import type { Message, MessageStatus } from "@/types/chat.types";
 interface MessageFeedProps {
   conversationId: string;
   recipientId: string;
+  onConversationResolved?: (pendingId: string, realId: string) => void;
 }
 
 // Unified message type for display
@@ -65,7 +66,7 @@ function groupMessages(messages: DisplayMessage[], currentUserId: string) {
   });
 }
 
-export function MessageFeed({ conversationId, recipientId }: MessageFeedProps) {
+export function MessageFeed({ conversationId, recipientId, onConversationResolved }: MessageFeedProps) {
   const { user } = useAuth();
   const { onNewMessage, onMessageSent, sendMessage } = useChat();
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
@@ -155,6 +156,13 @@ export function MessageFeed({ conversationId, recipientId }: MessageFeedProps) {
   // Fetch initial messages
   useEffect(() => {
     const fetchMessages = async () => {
+      // Skip fetching for pending conversations (new chats with no messages yet)
+      if (conversationId.startsWith("pending_")) {
+        setMessages([]);
+        setIsLoading(false);
+        return;
+      }
+      
       try {
         setIsLoading(true);
         setError(null);
@@ -222,7 +230,13 @@ export function MessageFeed({ conversationId, recipientId }: MessageFeedProps) {
   // Handle sent message acknowledgment - update optimistic message
   useEffect(() => {
     const unsubscribe = onMessageSent((ack) => {
-      if (ack.conversationId === conversationId) {
+      // For pending conversations, match by recipientId since we don't have a real conversationId yet
+      const isPending = conversationId.startsWith("pending_");
+      const shouldHandle = isPending 
+        ? ack.recipientId === recipientId 
+        : ack.conversationId === conversationId;
+      
+      if (shouldHandle) {
         setMessages((prev) => {
           // Find and update the optimistic message
           const updated = prev.map((msg) => {
@@ -231,6 +245,7 @@ export function MessageFeed({ conversationId, recipientId }: MessageFeedProps) {
               return {
                 ...msg,
                 _id: ack.messageId,
+                conversation_id: ack.conversationId, // Use real conversation ID
                 created_at: ack.created_at,
                 status: "sent" as MessageStatus,
               };
@@ -239,11 +254,16 @@ export function MessageFeed({ conversationId, recipientId }: MessageFeedProps) {
           });
           return updated;
         });
+        
+        // If this was a pending conversation, notify parent about the real ID
+        if (isPending && onConversationResolved) {
+          onConversationResolved(conversationId, ack.conversationId);
+        }
       }
     });
 
     return unsubscribe;
-  }, [onMessageSent, conversationId, user]);
+  }, [onMessageSent, conversationId, recipientId, onConversationResolved]);
 
   // Load more messages (older)
   const loadMore = useCallback(async () => {

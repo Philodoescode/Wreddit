@@ -94,6 +94,21 @@ export default function ChatPage() {
     setSelectedConversationId(conversation._id);
   }, []);
 
+  // Callback when a pending conversation is resolved with a real ID from the server
+  const handleConversationResolved = useCallback((pendingId: string, realId: string) => {
+    setConversations((prev) => 
+      prev.map((c) => 
+        c._id === pendingId 
+          ? { ...c, _id: realId }
+          : c
+      )
+    );
+    // Update selected ID if it was the pending one
+    setSelectedConversationId((prev) => 
+      prev === pendingId ? realId : prev
+    );
+  }, []);
+
   return (
     <ThemeProvider>
       <div className="flex flex-col h-screen bg-background">
@@ -126,6 +141,7 @@ export default function ChatPage() {
             conversation={selectedConversation}
             currentUserId={user?.id || ""}
             isOnline={getOtherParticipantOnlineStatus()}
+            onConversationResolved={handleConversationResolved}
           />
         </div>
       </div>

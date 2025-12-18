@@ -118,22 +118,47 @@ export function InboxSidebar({
 
   // Handle user selection from new chat dialog
   const handleUserSelect = useCallback(
-    (userId: string) => {
+    (selectedUser: { _id: string; username: string; userPhotoUrl?: string }) => {
       // Find existing conversation with this user
       const existingConv = conversations.find((conv) =>
-        conv.participants.some((p) => p._id === userId)
+        conv.participants.some((p) => p._id === selectedUser._id)
       );
 
       if (existingConv) {
         // Select existing conversation
         onConversationSelect(existingConv._id);
       } else {
-        // In Phase 3, we'll create a new conversation
-        // For now, just log it
-        console.log("Start new conversation with user:", userId);
+        // Create a pending conversation (will be created on backend when first message is sent)
+        const pendingConversation: Conversation = {
+          _id: `pending_${selectedUser._id}`,  // Special prefix to identify pending chats
+          participants: [
+            {
+              _id: user?.id || "",
+              username: user?.username || "",
+              userPhotoUrl: user?.userPhotoUrl,
+            },
+            {
+              _id: selectedUser._id,
+              username: selectedUser.username,
+              userPhotoUrl: selectedUser.userPhotoUrl,
+            },
+          ],
+          last_message: "",
+          updated_at: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+        };
+
+        // Add to conversations list and select it
+        setConversations((prev) => [pendingConversation, ...prev]);
+        onConversationSelect(pendingConversation._id);
+        
+        // Notify parent that a conversation was created (for chat-page state sync)
+        if (onConversationCreated) {
+          onConversationCreated(pendingConversation);
+        }
       }
     },
-    [conversations, onConversationSelect]
+    [conversations, onConversationSelect, onConversationCreated, user]
   );
 
   // Get online status for a user
