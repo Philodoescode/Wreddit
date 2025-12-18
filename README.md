@@ -1,106 +1,185 @@
 # Wreddit
-Open-source, full-stack clone of the popular community aggregation platform, designed to explore modern web technologies while fostering a vibrant, slightly self-aware community. We're here to see what you've wrote and maybe, just maybe, judge it slightly.
 
-## Prerequisites
+<div align="center">
 
-Before you begin, ensure you have the following tools installed on your system.
+### A modern, full-stack reddit clone with AI superpowers.
 
-*   **Git**: For cloning the repository.
-*   **Docker & Docker Compose**: For building and running the containerized application. Make sure the Docker daemon is running.
-*   **Node.js**: Recommended version `v18.x` or later.
-*   **pnpm**: This project uses `pnpm` as its package manager. If you don't have it, you can install it globally with npm (you should have npm installed already):
-    ```bash
-    npm install -g pnpm
-    ```
+![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
+![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
+![Node.js](https://img.shields.io/badge/Node.js-43853D?style=for-the-badge&logo=node.js&logoColor=white)
+![Express.js](https://img.shields.io/badge/Express.js-000000?style=for-the-badge&logo=express&logoColor=white)
+![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge&logo=mongodb&logoColor=white)
+![Redis](https://img.shields.io/badge/redis-%23DD0031.svg?&style=for-the-badge&logo=redis&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 
-## 🚀 Getting Started
+</div>
 
-Follow these steps to get your local development environment up and running.
+## 📖 About The Project
 
-### 1. Clone the Repository
+**Wreddit** is a robust, open-source community aggregation platform inspired by Reddit. It's built to explore the
+capabilities of modern web technologies, featuring real-time interactions, AI-generated content summaries, and a sleek,
+responsive user interface.
 
-First, clone the project from GitHub to your local machine:
+Whether you're looking to share links, discuss topics, or just lurk, Wreddit provides a familiar yet enhanced
+experience.
 
-```bash
-git clone https://github.com/Philodoescode/Wreddit.git
-cd Wreddit
-```
+### ✨ Key Features
 
-### 2. Start the Application
+* **👥 Communities**: Create and join topic-specific communities (subreddits) to find your people.
+* **📝 Rich Posts**: Share content with rich text support, images, and links.
+* **🤖 AI Summaries**: Instantly get the gist of long posts with integrated **Google Gemini AI** summarization.
+* **💬 Real-Time Chat**: Engage in live conversations with other users via WebSocket-powered chat rooms.
+* **🗳️ Voting System**: Upvote or downvote posts and comments to curate the best content.
+* **👤 User Profiles**: Customize your profile with avatars and banners, and view your activity history.
+* **🔍 Search**: Find communities and posts quickly with comprehensive search functionality.
+* **🌗 Dark Mode**: Easy on the eyes with a polished dark theme.
 
-The entire application stack (frontend, backend, and database) is managed by Docker Compose. To build the container images and start all the services, run the following command from the root directory of the project:
+## 🛠️ Technology Stack
 
-```bash
-docker-compose up --build
-```
+Wreddit is built using a modern MERN-like stack, leveraging the power of TypeScript and Docker.
 
-*   `--build`: This flag tells Docker Compose to build the images from your `Dockerfile`s the first time you run it or if any changes have been made to them.
-*   This command will take a few minutes the first time you run it as it needs to download the base images and install all the `pnpm` dependencies for both the client and server.
+### **Frontend (Client)**
 
-Once the process is complete, the application will be running in detached containers.
+* **Framework**: [React 19](https://react.dev/) + [Vite](https://vitejs.dev/)
+* **Language**: [TypeScript](https://www.typescriptlang.org/)
+* **Styling**: [Tailwind CSS v4](https://tailwindcss.com/)
+* **UI Components**: [Radix UI](https://www.radix-ui.com/), [Shadcn UI](https://ui.shadcn.com/)
+* **Icons**: [Lucide React](https://lucide.dev/)
+* **State & Forms**: [React Hook Form](https://react-hook-form.com/), [Zod](https://zod.dev/)
+* **Routing**: [React Router v7](https://reactrouter.com/)
 
-## 🛠️ Usage
+### **Backend (Server)**
 
-### Accessing the Services
+* **Runtime**: [Node.js](https://nodejs.org/)
+* **Framework**: [Express.js v5](https://expressjs.com/)
+* **Database**: [MongoDB](https://www.mongodb.com/) (with Mongoose ODM)
+* **Caching**: [Redis](https://redis.io/)
+* **Authentication**: JWT (JSON Web Tokens)
+* **Real-time**: [WebSocket (ws)](https://github.com/websockets/ws)
+* **AI Integration**: [Google Gemini AI](https://deepmind.google/technologies/gemini/)
 
-With the containers running, you can access the different parts of the application at the following URLs:
+### **DevOps & Tools**
 
-*   **Frontend (React + Vite)**: [http://localhost:5173](http://localhost:5173)
-*   **Backend (Node.js + Express)**: [http://localhost:5000](http://localhost:5000)
-*   **Database (MongoDB)**: Connect via a client at `mongodb://localhost:27017`
+* **Containerization**: [Docker](https://www.docker.com/) & Docker Compose
+* **Package Manager**: [pnpm](https://pnpm.io/)
+* **Linting**: ESLint, Prettier
 
-### Live Reloading
+## ⚙️ Prerequisites
 
-This setup is configured for live reloading. Any changes you save in the code within the `client/` or `server/` directories on your local machine will automatically trigger a restart or reload of the corresponding service inside its container.
+Before you begin, ensure you have the following installed on your machine:
 
-## ✅ How to Test the Setup
+* **[Git](https://git-scm.com/)**
+* **[Docker Desktop](https://www.docker.com/products/docker-desktop)** (Ensure the Docker daemon is running)
+* **[Node.js](https://nodejs.org/)** (v18.x or later recommended for local execution without Docker)
+* **[pnpm](https://pnpm.io/installation)** (Optional, if running locally without Docker)
 
-To verify that all services are running correctly, you can perform these simple checks:
+## 🚀 Installation & Setup
 
-1.  **Test the Frontend**:
-    *   Open your web browser and navigate to **[http://localhost:5173](http://localhost:5173)**.
-    *   You should see the default React + Vite starter page.
+1. **Clone the Repository**
+   ```bash
+   git clone https://github.com/Philodoescode/Wreddit.git
+   cd Wreddit
+   ```
 
-2.  **Test the Backend API**:
-    *   Open another browser tab and navigate to **[http://localhost:5000](http://localhost:5000)**.
-    *   You should see the message: `Hello from the Wreddit server!`
+2. **Environment Configuration**
 
-3.  **Check Running Containers**:
-    *   Open a new terminal window and run `docker ps`.
-    *   You should see three containers running with names like `wreddit_client`, `wreddit_server`, and `wreddit_mongo`.
+   You need to set up environment variables for the application to function correctly, especially for AI features.
 
-## ⚙️ Useful Docker Commands
+   Create a `.env` file in the **root** directory (or check `server/` and `client/` if separate configs are needed, but
+   typically the root `.env` is used by Docker):
 
-Here are some common commands for managing your development environment:
+   ```bash
+   cp .env.example .env
+   ```
 
-*   **Start all services**:
-    ```bash
-    docker-compose up
-    ```
+   **Required Variables:**
+    * `GEMINI_API_KEY`: Get your API key from [Google AI Studio](https://aistudio.google.com/).
+    * `MONGO_URI`: (Optional) Defaults to `mongodb://mongo:27017/wreddit` in Docker.
+    * `JWT_SECRET`: (Optional) Secret key for signing tokens.
 
-*   **Stop and remove all services, volumes, and networks**:
-    ```bash
-    docker-compose down
-    ```
+3. **Run with Docker (Recommended)**
 
-*   **View logs for a specific service** (in real-time):
-    ```bash
-    # View logs for the backend
-    docker-compose logs -f server
+   The easiest way to start Wreddit is using Docker Compose. This will spin up the Client, Server, MongoDB, and Redis
+   containers.
 
-    # View logs for the frontend
-    docker-compose logs -f client
-    ```
+   ```bash
+   docker-compose up --build
+   ```
 
-*   **List all running containers**:
-    ```bash
-    docker ps
-    ```
+    * **Frontend**: http://localhost:5173
+    * **Backend**: http://localhost:5000
+    * **Mongo Express** (if enabled): http://localhost:8081
+
+4. **Run Locally (Dev Mode)**
+
+   If you prefer to run services individually:
+
+    * **Server**:
+      ```bash
+      cd server
+      pnpm install
+      pnpm start
+      ```
+    * **Client**:
+      ```bash
+      cd client
+      pnpm install
+      pnpm dev
+      ```
 
 ## 📂 Project Structure
 
-The project is organized into two main directories:
+```
+Wreddit/
+├── client/                 # Frontend React Application
+│   ├── src/
+│   │   ├── components/     # Reusable UI components
+│   │   ├── pages/          # Route page components (Home, Profile, etc.)
+│   │   ├── hooks/          # Custom React hooks
+│   │   └── lib/            # Utilities and helpers
+│   ├── public/             # Static assets
+│   └── package.json
+│
+├── server/                 # Backend Express Application
+│   ├── controller/         # Request logic handlers
+│   ├── model/              # Mongoose schemas (User, Post, Community)
+│   ├── routes/             # API route definitions
+│   ├── websocket/          # Real-time chat logic
+│   ├── uploads/            # User uploaded content
+│   └── package.json
+│
+├── docker-compose.yml      # Docker services orchestration
+└── README.md
+```
 
-*   **`/client`**: Contains the React/Vite frontend application.
-*   **`/server`**: Contains the Node.js/Express backend API.
-*   **`docker-compose.yml`**: The central configuration file for orchestrating all our Docker containers.
+## 🤝 Contributing
+
+Contributions are what make the open-source community such an amazing place to learn, inspire, and create. Any
+contributions you make are **greatly appreciated**.
+
+1. Fork the Project
+2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the Branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## ✍️ Authors
+
+* Yousif Abdulhafiz - [@ysif9](https://github.com/ysif9)
+* Philodoescode [Philodoescode](https://github.com/Philodoescode)
+* Saifeldin Elsayes - [@Saifeldinsais](https://github.com/Saifeldinsais)
+* Noha Elsayed - [@Nohaelsayedd](https://github.com/Nohaelsayedd)
+* Hams Hassan - [@Hams2305](https://github.com/Hams2305)
+* Jana Sameh - [@janasameh7](https://github.com/janasameh7)
+
+## 📄 License
+
+Distributed under the **MIT License**. See `LICENSE` for more information.
+
+
+
+<div align="center">
+Built with ❤️ by the Wreddit Team
+</div>
