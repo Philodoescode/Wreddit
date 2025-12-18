@@ -23,6 +23,10 @@ createRoot(document.getElementById('root')!).render(
                 <ChatProvider>
                     <AuthModalProvider>
                         <Routes>
+                            {/* Chat page - full screen without nav/footer */}
+                            <Route path="chat" element={<ChatPage/>}/>
+                            
+                            {/* Main app layout with nav/footer */}
                             <Route path="/" element={<App/>}>
                                 <Route index element={<HomePage/>}/>
                                 <Route path="user/:username" element={<ProfilePage/>}/>
@@ -30,7 +34,6 @@ createRoot(document.getElementById('root')!).render(
                                 <Route path="r/:communityName" element={<CommunityPage/>}/>
                                 <Route path="posts/:id" element={<PostDetailPage/>}/>
                                 <Route path="submit" element={<SubmitPage/>}/>
-                                <Route path="chat" element={<ChatPage/>}/>
                             </Route>
                         </Routes>
                         <AuthModal/>

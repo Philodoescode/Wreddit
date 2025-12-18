@@ -12,11 +12,13 @@ import type { Conversation } from "@/types/chat.types";
 interface InboxSidebarProps {
   selectedConversationId?: string;
   onConversationSelect: (conversationId: string) => void;
+  onConversationCreated?: (conversation: Conversation) => void;
 }
 
 export function InboxSidebar({
   selectedConversationId,
   onConversationSelect,
+  onConversationCreated,
 }: InboxSidebarProps) {
   const { user } = useAuth();
   const { onNewMessage, onMessageSent, onUserStatus } = useChat();

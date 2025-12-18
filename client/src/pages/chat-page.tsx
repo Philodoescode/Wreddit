@@ -1,19 +1,40 @@
 import { useState, useEffect, useCallback } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { InboxSidebar } from "@/components/chat/inbox-sidebar";
 import { ChatWindow } from "@/components/chat/chat-window";
 import { chatService } from "@/lib/chat-service";
 import { useChat } from "@/context/chat-provider";
 import { useAuth } from "@/context/auth-provider";
+import { ThemeProvider } from "@/components/theme-provider";
+import ThemeToggle from "@/components/theme-toggle";
 import type { Conversation } from "@/types/chat.types";
 
 export default function ChatPage() {
   const { user } = useAuth();
   const { onUserStatus } = useChat();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [selectedConversationId, setSelectedConversationId] = useState<
     string | undefined
   >(undefined);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [onlineUsers, setOnlineUsers] = useState<Map<string, boolean>>(new Map());
+
+  // Handle newChat query param for profile page integration
+  useEffect(() => {
+    const newChatUserId = searchParams.get("newChat");
+    if (newChatUserId && conversations.length > 0) {
+      // Try to find existing conversation with this user
+      const existingConv = conversations.find((c) =>
+        c.participants.some((p) => p._id === newChatUserId)
+      );
+      if (existingConv) {
+        setSelectedConversationId(existingConv._id);
+      }
+      // Clear the query param
+      searchParams.delete("newChat");
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams, conversations]);
 
   // Fetch conversations on mount
   useEffect(() => {
@@ -61,23 +82,53 @@ export default function ChatPage() {
     setSelectedConversationId(conversationId);
   }, []);
 
-  return (
-    <div className="flex h-[calc(100vh-4rem)]">
-      {/* Left: Inbox Sidebar */}
-      <div className="w-80 shrink-0">
-        <InboxSidebar
-          selectedConversationId={selectedConversationId}
-          onConversationSelect={handleConversationSelect}
-        />
-      </div>
+  // Callback when a new conversation is created (from NewChatDialog)
+  const handleConversationCreated = useCallback((conversation: Conversation) => {
+    setConversations((prev) => {
+      // Check if already exists
+      if (prev.some((c) => c._id === conversation._id)) {
+        return prev;
+      }
+      return [conversation, ...prev];
+    });
+    setSelectedConversationId(conversation._id);
+  }, []);
 
-      {/* Right: Chat Window */}
-      <ChatWindow
-        conversation={selectedConversation}
-        currentUserId={user?.id || ""}
-        isOnline={getOtherParticipantOnlineStatus()}
-      />
-    </div>
+  return (
+    <ThemeProvider>
+      <div className="flex flex-col h-screen bg-background">
+        {/* Header with logo */}
+        <header className="flex items-center justify-between h-14 px-4 border-b bg-background shrink-0">
+          <Link to="/" className="flex items-center gap-2 text-primary hover:text-primary/90">
+            <img
+              src="/Reddit_Symbol_23.svg"
+              alt="Wreddit"
+              className="h-8 w-auto"
+            />
+            <span className="font-semibold text-lg hidden sm:inline">wreddit</span>
+          </Link>
+          <ThemeToggle />
+        </header>
+
+        {/* Main chat area */}
+        <div className="flex flex-1 overflow-hidden">
+          {/* Left: Inbox Sidebar */}
+          <div className="w-80 shrink-0 border-r">
+            <InboxSidebar
+              selectedConversationId={selectedConversationId}
+              onConversationSelect={handleConversationSelect}
+              onConversationCreated={handleConversationCreated}
+            />
+          </div>
+
+          {/* Right: Chat Window */}
+          <ChatWindow
+            conversation={selectedConversation}
+            currentUserId={user?.id || ""}
+            isOnline={getOtherParticipantOnlineStatus()}
+          />
+        </div>
+      </div>
+    </ThemeProvider>
   );
 }
-

@@ -111,3 +111,11 @@ export interface MessagesResponse {
   nextCursor: string | null;
 }
 
+// Local message for optimistic UI updates
+export type MessageStatus = "sending" | "sent" | "failed";
+
+export interface LocalMessage extends Omit<Message, "_id"> {
+  _id: string;          // Real or temporary ID
+  localId: string;      // Client-side unique ID for tracking
+  status: MessageStatus;
+}
