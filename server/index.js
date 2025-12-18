@@ -69,6 +69,7 @@ app.use('/api/comments', require('./routes/comment.routes')); // Keep this too
 
 app.use('/api/search', require('./routes/search.routes'));
 app.use('/api/vote', require('./routes/vote.routes'));
+app.use('/api/chat', require('./routes/chat.routes'));
 
 app.get('/', (req, res) => {
   res.send('Hello from the Wreddit server! MongoDB connection initiated.');

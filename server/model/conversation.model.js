@@ -20,4 +20,7 @@ const ConversationSchema = new Schema(
   }
 );
 
+// Compound index for efficient inbox queries
+ConversationSchema.index({ participants: 1, updated_at: -1 });
+
 module.exports = mongoose.model("Conversation", ConversationSchema);
