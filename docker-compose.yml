@@ -1,0 +1,53 @@
+services:
+  server:
+    build: ./server
+    container_name: wreddit_server
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./server:/app
+      - /app/node_modules
+    environment:
+      # REVISED: The ?replicaSet=rs0 parameter MUST be removed.
+      - MONGO_URI=mongodb://mongo:27017/wreddit
+      - JWT_SECRET=dev-secret
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - mongo
+      - redis
+
+  client:
+    build: ./client
+    container_name: wreddit_client
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./client:/app
+      - /app/node_modules
+    stdin_open: true
+    tty: true
+
+  mongo:
+    image: mongo:latest
+    container_name: wreddit_mongo
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongo-data:/data/db
+    # REVISED: Removed replica set and healthcheck.
+    # This runs a simple, standalone MongoDB instance.
+    command: ["--bind_ip_all"]
+
+  redis:
+    image: redis:latest
+    container_name: wreddit_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+
+volumes:
+  mongo-data:
+  redis-data:

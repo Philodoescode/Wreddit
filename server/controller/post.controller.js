@@ -1,0 +1,508 @@
+const Post = require('../model/post.model');
+const Community = require('../model/community.model');
+const Subscription = require('../model/subscription.model');
+const Vote = require("../model/vote.model");
+const mongoose = require('mongoose');
+const fs = require('fs');
+const { GoogleGenAI } = require('@google/genai');
+
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+const model = 'gemini-2.5-flash';
+
+// Cleanup uploaded files if error
+const cleanupUploadedFiles = (files) => {
+    if (!files || files.length === 0) return;
+    files.forEach(file => {
+        try {
+            if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
+        } catch (err) {
+            console.error(`Failed to cleanup file ${file.path}:`, err.message);
+        }
+    });
+};
+
+// Determine post type
+const determinePostType = (hasMedia, hasLink, hasBody) => {
+    if (hasMedia) return 'media';
+    if (hasLink) return 'link';
+    return 'text';
+};
+
+// Create a post
+const createPost = async (req, res) => {
+    const files = req.files || [];
+    try {
+        const { title, body, linkUrl, communityName } = req.body;
+        const authorId = req.userId;
+
+        if (!title || !title.trim()) {
+            cleanupUploadedFiles(files);
+            return res.status(400).json({ status: 'fail', message: 'Title is required' });
+        }
+        if (title.length > 300) {
+            cleanupUploadedFiles(files);
+            return res.status(400).json({ status: 'fail', message: 'Title cannot exceed 300 characters' });
+        }
+
+        const hasBody = body && body.trim().length > 0;
+        const hasLink = linkUrl && linkUrl.trim().length > 0;
+        const hasMedia = files.length > 0;
+        if (!hasBody && !hasLink && !hasMedia) {
+            cleanupUploadedFiles(files);
+            return res.status(400).json({ status: 'fail', message: 'Post must have body text, a link, or media' });
+        }
+
+        if (hasLink && !/^https?:\/\/.+/.test(linkUrl.trim())) {
+            cleanupUploadedFiles(files);
+            return res.status(400).json({ status: 'fail', message: 'Link URL must start with http:// or https://' });
+        }
+
+        if (!communityName || !communityName.trim()) {
+            cleanupUploadedFiles(files);
+            return res.status(400).json({ status: 'fail', message: 'Community name is required' });
+        }
+
+        const community = await Community.findOne({ name: communityName.trim() });
+        if (!community) {
+            cleanupUploadedFiles(files);
+            return res.status(404).json({ status: 'fail', message: 'Community not found' });
+        }
+
+        if (community.privacyType === 'restricted' || community.privacyType === 'private') {
+            const subscription = await Subscription.findOne({ user: authorId, community: community._id });
+            if (!subscription) {
+                cleanupUploadedFiles(files);
+                return res.status(403).json({ status: 'fail', message: `You must be a member of r/${communityName} to post` });
+            }
+        }
+
+        const mediaUrls = files.map(file => `/uploads/posts/${file.filename}`);
+        const postType = determinePostType(hasMedia, hasLink, hasBody);
+
+        const post = await Post.create({
+            title: title.trim(),
+            type: postType,
+            body: hasBody ? body.trim() : '',
+            linkUrl: hasLink ? linkUrl.trim() : null,
+            mediaUrls,
+            author: authorId,
+            community: community._id,
+        });
+
+        community.postCount = (community.postCount || 0) + 1;
+        await community.save();
+
+        await post.populate('author', 'username userPhotoUrl');
+        await post.populate('community', 'name title iconImage');
+
+        res.status(201).json({ status: 'success', data: post });
+    } catch (error) {
+        cleanupUploadedFiles(files);
+        console.error('Post creation error:', error);
+        res.status(500).json({ status: 'fail', message: `Error creating post: ${error.message}` });
+    }
+};
+
+// Get posts for feed / community
+const getPosts = async (req, res) => {
+    try {
+        const { community, feed, page = 1, limit = 10 } = req.query;
+        const userId = req.userId;
+
+        const pageNum = Number(page) || 1;
+        const limitNum = Number(limit) || 10;
+
+        let query = {};
+
+        if (feed === 'home' && userId) {
+            const subs = await Subscription.find({ user: userId }).select('community -_id');
+            if (subs.length > 0) {
+                const communityIds = subs.map(sub => sub.community).sort(() => Math.random() - 0.5).slice(0, 10);
+                query.community = { $in: communityIds };
+            }
+        }
+
+        if (community) {
+            const comm = await Community.findOne({ name: community });
+            if (!comm) return res.status(404).json({ status: 'fail', message: 'Community not found' });
+            query.community = comm._id;
+        }
+
+        let posts = await Post.find(query)
+            .sort({ createdAt: -1 })
+            .skip((pageNum - 1) * limitNum)
+            .limit(limitNum)
+            .populate('author', 'username userPhotoUrl')
+            .populate('community', 'name title iconImage')
+            .lean();
+
+        // ✅ Attach currentUserVote for frontend
+        if (userId) {
+            const postIds = posts.map(p => p._id);
+            const votes = await Vote.find({ postId: { $in: postIds }, userId });
+            const votesMap = {};
+            votes.forEach(v => { votesMap[v.postId.toString()] = v.value; });
+            posts = posts.map(p => ({ ...p, currentUserVote: votesMap[p._id.toString()] ?? null }));
+        } else {
+            posts = posts.map(p => ({ ...p, currentUserVote: null }));
+        }
+
+        res.status(200).json({ status: 'success', data: posts });
+    } catch (error) {
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+};
+
+// Get single post
+const getPostById = async (req, res) => {
+    try {
+        const postId = req.params.id;
+        const userId = req.userId;
+
+        if (!postId || !mongoose.Types.ObjectId.isValid(postId))
+            return res.status(400).json({ status: 'fail', message: 'Invalid post ID' });
+
+        let post = await Post.findById(postId)
+            .populate('author', 'username userPhotoUrl')
+            .populate('community', 'name title iconImage')
+            .lean();
+
+        if (!post) return res.status(404).json({ status: 'fail', message: 'Post not found' });
+
+        // ✅ Add currentUserVote
+        if (userId) {
+            const vote = await Vote.findOne({ postId: post._id, userId });
+            post.currentUserVote = vote ? vote.value : null;
+        } else {
+            post.currentUserVote = null;
+        }
+
+        res.status(200).json({ status: 'success', data: post });
+    } catch (error) {
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+};
+
+
+/**
+ * Get existing AI summary for a post (without generating)
+ * GET /api/posts/:id/summary
+ */
+const getSummary = async (req, res) => {
+    try {
+        const postId = req.params.id;
+
+        // Validate post ID
+        if (!postId || !mongoose.Types.ObjectId.isValid(postId)) {
+            return res.status(400).json({
+                status: 'fail',
+                message: 'Invalid post ID'
+            });
+        }
+
+        // Fetch the post
+        const post = await Post.findById(postId).select('aiSummary').lean();
+
+        if (!post) {
+            return res.status(404).json({
+                status: 'fail',
+                message: 'Post not found'
+            });
+        }
+
+        // Check if summary exists
+        if (!post.aiSummary?.text) {
+            return res.status(404).json({
+                status: 'fail',
+                message: 'No summary found for this post'
+            });
+        }
+
+        res.status(200).json({
+            status: 'success',
+            data: {
+                summary: post.aiSummary.text,
+                postId: postId,
+                generatedAt: post.aiSummary.generatedAt?.toISOString() || null,
+                fromCache: true,
+                includesComments: post.aiSummary.includesComments || false,
+                commentsAnalyzed: post.aiSummary.commentsAnalyzed || 0
+            }
+        });
+    } catch (error) {
+        console.error('Get summary error:', error);
+        res.status(500).json({
+            status: 'fail',
+            message: 'Failed to fetch summary'
+        });
+    }
+};
+
+/**
+ * Smart comment sampling strategy for AI summary
+ * Selects a diverse set of comments to analyze crowd reactions
+ * @param {Array} comments - All comments for the post
+ * @param {Number} maxComments - Maximum number of comments to include (default: 15)
+ * @returns {Array} - Sampled comments
+ */
+const sampleCommentsForSummary = (comments, maxComments = 15) => {
+    if (!comments || comments.length === 0) return [];
+
+    // Filter to only top-level comments (no nested replies)
+    const topLevelComments = comments.filter(c => !c.parentId);
+
+    if (topLevelComments.length <= maxComments) {
+        return topLevelComments;
+    }
+
+    // Sort by createdAt to get chronological order
+    const sortedComments = [...topLevelComments].sort((a, b) =>
+        new Date(a.createdAt) - new Date(b.createdAt)
+    );
+
+    // Strategy: Take a mix of early, middle, and recent comments
+    // This captures evolving sentiment and diverse perspectives
+    const sampled = [];
+    const step = Math.floor(sortedComments.length / maxComments);
+
+    for (let i = 0; i < maxComments && i * step < sortedComments.length; i++) {
+        const index = i * step;
+        const comment = sortedComments[index];
+
+        // Truncate very long comments to save tokens (max 500 chars)
+        if (comment.content && comment.content.length > 500) {
+            comment.content = comment.content.substring(0, 497) + '...';
+        }
+
+        sampled.push(comment);
+    }
+
+    return sampled;
+};
+
+/**
+ * Generate AI summary for a post
+ * POST /api/posts/:id/summarize
+ * Query params:
+ *   - regenerate=true: Force regeneration of summary even if one exists
+ */
+const summarizePost = async (req, res) => {
+    try {
+        const postId = req.params.id;
+        const regenerate = req.query.regenerate === 'true';
+
+        // Validate post ID
+        if (!postId || !mongoose.Types.ObjectId.isValid(postId)) {
+            return res.status(400).json({
+                status: 'fail',
+                message: 'Invalid post ID'
+            });
+        }
+
+        // Fetch the post (not lean, we need to save it)
+        const post = await Post.findById(postId)
+            .populate('author', 'username')
+            .populate('community', 'name');
+
+        if (!post) {
+            return res.status(404).json({
+                status: 'fail',
+                message: 'Post not found'
+            });
+        }
+
+        // Check if summary already exists (unless regenerating)
+        if (!regenerate && post.aiSummary?.text) {
+            return res.status(200).json({
+                status: 'success',
+                data: {
+                    summary: post.aiSummary.text,
+                    postId: post._id,
+                    generatedAt: post.aiSummary.generatedAt?.toISOString() || null,
+                    fromCache: true,
+                    includesComments: post.aiSummary.includesComments || false,
+                    commentsAnalyzed: post.aiSummary.commentsAnalyzed || 0
+                }
+            });
+        }
+
+        // Check if there's content to summarize
+        const contentToSummarize = post.body?.trim();
+        if (!contentToSummarize || contentToSummarize.length < 50) {
+            return res.status(400).json({
+                status: 'fail',
+                message: 'Post content is too short to summarize (minimum 50 characters)'
+            });
+        }
+
+        // Initialize Google GenAI
+        if (!GEMINI_API_KEY) {
+            console.error('GEMINI_API_KEY is not configured');
+            return res.status(500).json({
+                status: 'fail',
+                message: 'AI service is not configured'
+            });
+        }
+
+        // Fetch and sample comments if available
+        let sampledComments = [];
+        let includesComments = false;
+        let commentsAnalyzed = 0;
+
+        if (post.commentCount > 0) {
+            try {
+                // Fetch all comments for this post
+                const allComments = await Comment.find({ postId: post._id })
+                    .sort({ createdAt: 1 })
+                    .populate('userId', 'username')
+                    .lean();
+
+                // Sample comments using smart strategy
+                sampledComments = sampleCommentsForSummary(allComments, 15);
+                includesComments = sampledComments.length > 0;
+                commentsAnalyzed = sampledComments.length;
+
+                console.log(`Sampled ${commentsAnalyzed} comments out of ${allComments.length} total for post ${postId}`);
+            } catch (commentError) {
+                console.error('Error fetching comments for summary:', commentError);
+                // Continue without comments if there's an error
+            }
+        }
+
+        // Prepare the prompt with or without comments
+        let prompt = `You are a helpful assistant that summarizes Reddit posts. Please provide a concise, informative summary of the following post.
+
+Title: ${post.title}
+
+Content:
+${contentToSummarize}`;
+
+        // Add comments section if available
+        if (includesComments && sampledComments.length > 0) {
+            prompt += `\n\n--- Community Comments (${commentsAnalyzed} sampled) ---\n`;
+            sampledComments.forEach((comment, index) => {
+                const username = comment.userId?.username || 'Anonymous';
+                prompt += `\nComment ${index + 1} by ${username}:\n${comment.content}\n`;
+            });
+
+            prompt += `\n\nPlease provide a summary that:
+1. Captures the main points and key information from the post
+2. Summarizes the overall crowd reaction and sentiment from the comments
+3. Highlights key themes, perspectives, or debates in the comment section
+4. Notes any interesting consensus or disagreements among commenters
+5. Is concise (3-5 sentences total)
+6. Is objective and neutral in tone
+
+Summary:`;
+        } else {
+            prompt += `\n\nPlease provide a summary that:
+1. Captures the main points and key information
+2. Is concise (2-4 sentences)
+3. Is objective and neutral in tone
+4. Highlights any important details or conclusions
+
+Summary:`;
+        }
+
+        const config = {
+            thinkingConfig: {
+                thinkingBudget: 0,
+            },
+        };
+
+        const contents = [
+            {
+                role: 'user',
+                parts: [
+                    {
+                        text: prompt,
+                    },
+                ],
+            },
+        ];
+
+        // Generate summary with timeout
+        const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Request timeout')), 30000); // 30 second timeout
+        });
+
+        const summaryPromise = (async () => {
+            const response = await ai.models.generateContent({
+                model,
+                config,
+                contents,
+            });
+
+            // Extract the summary text
+            const summary = response.text || '';
+
+            if (!summary) {
+                throw new Error('No summary generated');
+            }
+
+            return summary;
+        })();
+
+        const summary = await Promise.race([summaryPromise, timeoutPromise]);
+        const trimmedSummary = summary.trim();
+        const generatedAt = new Date();
+
+        // Save summary to the post document
+        post.aiSummary = {
+            text: trimmedSummary,
+            generatedAt: generatedAt,
+            includesComments: includesComments,
+            commentsAnalyzed: commentsAnalyzed
+        };
+        await post.save();
+
+        // Return the summary
+        res.status(200).json({
+            status: 'success',
+            data: {
+                summary: trimmedSummary,
+                postId: post._id,
+                generatedAt: generatedAt.toISOString(),
+                fromCache: false,
+                includesComments: includesComments,
+                commentsAnalyzed: commentsAnalyzed
+            }
+        });
+
+    } catch (error) {
+        console.error('AI summarization error:', error);
+
+        // Handle specific error types
+        if (error.message === 'Request timeout') {
+            return res.status(504).json({
+                status: 'fail',
+                message: 'AI service timeout. Please try again.'
+            });
+        }
+
+        if (error.message?.includes('API key')) {
+            return res.status(500).json({
+                status: 'fail',
+                message: 'AI service configuration error'
+            });
+        }
+
+        if (error.message?.includes('quota') || error.message?.includes('rate limit')) {
+            return res.status(429).json({
+                status: 'fail',
+                message: 'AI service rate limit reached. Please try again later.'
+            });
+        }
+
+        // Generic error response
+        res.status(500).json({
+            status: 'fail',
+            message: 'Failed to generate summary. Please try again.'
+        });
+    }
+};
+
+module.exports = {
+    createPost, getPosts, getPostById, summarizePost, getSummary
+};
