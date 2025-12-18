@@ -21,7 +21,7 @@ type SearchResults = {
     communities: SearchCommunity[];
 };
 
-const API_BASE_URL = "http://localhost:5000";
+const API_BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:5000/api").replace(/\/api\/?$/, "");
 
 export default function SearchBar() {
 
@@ -117,7 +117,7 @@ export default function SearchBar() {
 
     const deleteRecent = async (term: string) => {
         try {
-            await axios.delete(`http://localhost:5000/api/search/${encodeURIComponent(term)}`, {
+            await axios.delete(`${API_BASE_URL}/api/search/${encodeURIComponent(term)}`, {
                 headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
             });
 
