@@ -7,7 +7,7 @@ const { WebSocketServer } = require("ws");
 const { extractToken, verifyToken } = require("./wsAuth");
 const { addClient, removeClient } = require("./connectedClients");
 const { handleMessage } = require("./messageHandler");
-const { initSubscriber } = require("../redis/messageDispatcher");
+const { initSubscriber, publishPresence } = require("../redis/messageDispatcher");
 
 /**
  * Initialize WebSocket server and attach to HTTP server
@@ -50,6 +50,9 @@ const initWebSocket = (httpServer) => {
     addClient(userId, ws);
     console.log(`User ${userId} connected.`);
 
+    // Publish online presence to chat partners (non-blocking)
+    publishPresence(userId, "online");
+
     // Handle incoming messages
     ws.on("message", (data) => {
       handleMessage(ws, data);
@@ -59,6 +62,9 @@ const initWebSocket = (httpServer) => {
     ws.on("close", () => {
       removeClient(userId);
       console.log(`User ${userId} disconnected.`);
+
+      // Publish offline presence to chat partners (non-blocking)
+      publishPresence(userId, "offline");
     });
 
     // Handle errors

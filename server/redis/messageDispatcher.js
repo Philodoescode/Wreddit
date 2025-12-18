@@ -5,6 +5,7 @@
 
 const { publisher, subscriber } = require("./redisClient");
 const { getClient } = require("../websocket/connectedClients");
+const Conversation = require("../model/conversation.model");
 
 const CHANNEL = "global_dispatch";
 
@@ -18,6 +19,7 @@ const CHANNEL = "global_dispatch";
  */
 const publishMessage = async (targetId, senderId, text, messageId, timestamp) => {
   const event = JSON.stringify({
+    type: "MESSAGE",
     target_id: targetId,
     sender_id: senderId,
     text,
@@ -26,7 +28,52 @@ const publishMessage = async (targetId, senderId, text, messageId, timestamp) =>
   });
 
   await publisher.publish(CHANNEL, event);
-  console.log("Event published to Redis");
+  console.log("Message event published to Redis");
+};
+
+/**
+ * Publish presence (online/offline) event to Redis for targeted delivery
+ * @param {string} userId - User whose status changed
+ * @param {string} status - "online" or "offline"
+ */
+const publishPresence = async (userId, status) => {
+  try {
+    // Query MongoDB for user's chat partners
+    const conversations = await Conversation.find(
+      { participants: userId },
+      { participants: 1 }
+    ).lean();
+
+    // Extract unique contact IDs (exclude self)
+    const targets = [
+      ...new Set(
+        conversations.flatMap((c) =>
+          c.participants
+            .map((p) => p.toString())
+            .filter((p) => p !== userId)
+        )
+      ),
+    ];
+
+    if (targets.length === 0) {
+      console.log(`No chat partners for user ${userId}, skipping presence broadcast`);
+      return;
+    }
+
+    // Publish targeted presence event
+    const event = JSON.stringify({
+      type: "PRESENCE_CHANGE",
+      senderId: userId,
+      status,
+      targets,
+    });
+
+    await publisher.publish(CHANNEL, event);
+    console.log(`Presence ${status} published for user ${userId} to ${targets.length} targets`);
+  } catch (error) {
+    // Non-blocking: log error but don't disrupt connection flow
+    console.error("Failed to publish presence:", error.message);
+  }
 };
 
 /**
@@ -45,33 +92,17 @@ const initSubscriber = () => {
   subscriber.on("message", (channel, message) => {
     if (channel !== CHANNEL) return;
 
-    console.log("Event received from Redis");
-
     try {
-      const { target_id, sender_id, text, message_id, timestamp } =
-        JSON.parse(message);
+      const data = JSON.parse(message);
 
-      // Check if recipient is connected to this server instance
-      const recipientSocket = getClient(target_id);
-
-      if (recipientSocket && recipientSocket.readyState === 1) {
-        // WebSocket.OPEN = 1
-        recipientSocket.send(
-          JSON.stringify({
-            type: "NEW_MESSAGE",
-            payload: {
-              sender_id,
-              text,
-              message_id,
-              timestamp,
-            },
-          })
-        );
-        console.log(`Message delivered to user ${target_id}`);
+      if (data.type === "PRESENCE_CHANGE") {
+        // Handle presence updates - deliver to locally connected targets
+        handlePresenceChange(data);
+      } else if (data.type === "MESSAGE") {
+        // Handle chat messages
+        handleMessageDelivery(data);
       } else {
-        // User is offline or connected to a different server instance
-        // Message is already safely stored in MongoDB
-        console.log(`User ${target_id} not connected to this instance`);
+        console.log(`Unknown event type: ${data.type}`);
       }
     } catch (error) {
       console.error("Failed to process Redis message:", error.message);
@@ -79,4 +110,53 @@ const initSubscriber = () => {
   });
 };
 
-module.exports = { publishMessage, initSubscriber };
+/**
+ * Handle presence change events from Redis
+ * @param {Object} data - { senderId, status, targets }
+ */
+const handlePresenceChange = (data) => {
+  const { senderId, status, targets } = data;
+
+  for (const targetId of targets) {
+    const ws = getClient(targetId);
+    if (ws && ws.readyState === 1) {
+      ws.send(
+        JSON.stringify({
+          type: "USER_STATUS",
+          payload: { userId: senderId, status },
+        })
+      );
+      console.log(`Presence ${status} delivered to user ${targetId}`);
+    }
+  }
+};
+
+/**
+ * Handle message delivery events from Redis
+ * @param {Object} data - { target_id, sender_id, text, message_id, timestamp }
+ */
+const handleMessageDelivery = (data) => {
+  const { target_id, sender_id, text, message_id, timestamp } = data;
+
+  const recipientSocket = getClient(target_id);
+
+  if (recipientSocket && recipientSocket.readyState === 1) {
+    recipientSocket.send(
+      JSON.stringify({
+        type: "NEW_MESSAGE",
+        payload: {
+          sender_id,
+          text,
+          message_id,
+          timestamp,
+        },
+      })
+    );
+    console.log(`Message delivered to user ${target_id}`);
+  } else {
+    console.log(`User ${target_id} not connected to this instance`);
+  }
+};
+
+module.exports = { publishMessage, publishPresence, initSubscriber };
+
