@@ -2,6 +2,7 @@ require('dotenv').config();
 
 
 const express = require('express');
+const http = require('http');
 const cors = require('cors');
 const morgan = require('morgan');
 const mongoose = require('mongoose');
@@ -67,11 +68,18 @@ app.use('/api/posts', require('./routes/comment.routes'));
 app.use('/api/comments', require('./routes/comment.routes')); // Keep this too
 
 app.use('/api/search', require('./routes/search.routes'));
+app.use('/api/vote', require('./routes/vote.routes'));
+app.use('/api/chat', require('./routes/chat.routes'));
 
 app.get('/', (req, res) => {
   res.send('Hello from the Wreddit server! MongoDB connection initiated.');
 });
 
-app.listen(port, () => {
+// Create HTTP server and attach WebSocket
+const server = http.createServer(app);
+const { initWebSocket } = require('./websocket/wsServer');
+initWebSocket(server);
+
+server.listen(port, () => {
   console.log(`Server is running on port: ${port}`);
 });

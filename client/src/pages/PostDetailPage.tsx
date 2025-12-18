@@ -8,8 +8,11 @@ import {Badge} from "@/components/ui/badge";
 import {Button} from "@/components/ui/button";
 import {Separator} from "@/components/ui/separator";
 import {formatTimeAgo, getImageUrl, isVideoUrl} from "@/lib/utils";
+import CommentSection from "@/components/commentSection";
+
 import type {Post} from "@/types/post";
 import type {ApiError} from "@/types/errors.ts";
+import AiSummary from "@/components/AiSummary";
 
 export default function PostDetailPage() {
     const {id} = useParams<{ id: string }>();
@@ -17,19 +20,26 @@ export default function PostDetailPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    const [userVote, setUserVote] = useState<1 | -1 | null>(null);
+    const [upvotes, setUpvotes] = useState(0);
+    const [downvotes, setDownvotes] = useState(0);
+    const [isVoting, setIsVoting] = useState(false);
+
     const fetchPost = useCallback(async () => {
         try {
             setLoading(true);
             setError(null);
 
-            const response = await api.get(`/posts/${id}`);
+            const res = await api.get(`/posts/${id}`);
+            const data: Post = res.data.data;
 
-            if (response.data.status === "success") {
-                setPost(response.data.data);
-            }
-        } catch (err: unknown) {
-            const error = err as ApiError;
-            setError(error.response?.data?.message || "Failed to load post");
+            setPost(data);
+            setUserVote(data.currentUserVote ?? null);
+            setUpvotes(data.upvotes);
+            setDownvotes(data.downvotes);
+        } catch (err) {
+            const e = err as ApiError;
+            setError(e.response?.data?.message || "Failed to load post");
         } finally {
             setLoading(false);
         }
@@ -39,15 +49,14 @@ export default function PostDetailPage() {
         fetchPost();
     }, [fetchPost]);
 
-    if (loading) {
+    if (loading)
         return (
             <div className="container mx-auto max-w-4xl p-4">
                 <div className="h-96 rounded-lg border bg-card animate-pulse"/>
             </div>
         );
-    }
 
-    if (error || !post) {
+    if (error || !post)
         return (
             <div className="container mx-auto max-w-4xl p-4">
                 <Card>
@@ -60,24 +69,67 @@ export default function PostDetailPage() {
                 </Card>
             </div>
         );
-    }
 
-    const netVotes = post.upvotes - post.downvotes;
+    const netVotes = upvotes - downvotes;
+
+    const handleVote = async (value: 1 | -1) => {
+        if (isVoting) return;
+        setIsVoting(true);
+
+        const prevUp = upvotes;
+        const prevDown = downvotes;
+        const prevVote = userVote;
+
+        let newUserVote: 1 | -1 | null = value;
+
+        if (userVote === value) {
+            if (value === 1) setUpvotes(v => v - 1);
+            else setDownvotes(v => v - 1);
+            newUserVote = null;
+        } else if (userVote === -value) {
+            if (value === 1) {
+                setUpvotes(v => v + 1);
+                setDownvotes(v => v - 1);
+            } else {
+                setDownvotes(v => v + 1);
+                setUpvotes(v => v - 1);
+            }
+        } else {
+            if (value === 1) setUpvotes(v => v + 1);
+            else setDownvotes(v => v + 1);
+        }
+
+        setUserVote(newUserVote);
+
+        try {
+            await api.post("/vote", {
+                postId: post._id,
+                value,
+            });
+        } catch (err) {
+            console.error("Vote failed", err);
+            setUpvotes(prevUp);
+            setDownvotes(prevDown);
+            setUserVote(prevVote);
+        } finally {
+            setIsVoting(false);
+        }
+    };
+
+    const arrowClass = (v: 1 | -1) =>
+        userVote === v ? (v === 1 ? "text-orange-500" : "text-purple-500") : "";
 
     return (
         <div className="container mx-auto max-w-4xl p-4">
             <Card>
                 <CardHeader className="pb-3">
-                    {/* Community and author info */}
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Link
-                            to={`/r/${post.community.name}`}
-                            className="font-semibold hover:underline flex items-center gap-1"
-                        >
+                        <Link to={`/r/${post.community.name}`}
+                              className="font-semibold hover:underline flex items-center gap-1">
                             {post.community.iconImage && (
                                 <Avatar className="h-6 w-6">
                                     <AvatarImage src={getImageUrl(post.community.iconImage)}/>
-                                    <AvatarFallback>{post.community.name[0].toUpperCase()}</AvatarFallback>
+                                    <AvatarFallback>{post.community.name[0]}</AvatarFallback>
                                 </Avatar>
                             )}
                             r/{post.community.name}
@@ -95,83 +147,60 @@ export default function PostDetailPage() {
                 </CardHeader>
 
                 <CardContent>
-                    {/* Title */}
                     <h1 className="text-2xl font-bold mb-4">{post.title}</h1>
 
-                    {/* Post type badge */}
                     {post.type !== "text" && (
                         <Badge variant="secondary" className="mb-4">
                             {post.type === "media" ? "Media" : "Link"}
                         </Badge>
                     )}
 
-                    {/* Body content */}
-                    {post.body && (
-                        <div className="prose prose-neutral dark:prose-invert max-w-none mb-4">
-                            <p className="whitespace-pre-wrap">{post.body}</p>
-                        </div>
-                    )}
+                    {post.body && <p className="mb-4 whitespace-pre-wrap">{post.body}</p>}
 
-                    {/* Link */}
                     {post.linkUrl && (
-                        <div className="mb-4">
-                            <a
-                                href={post.linkUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-primary hover:underline inline-block break-all"
-                            >
-                                {post.linkUrl}
-                            </a>
+                        <a href={post.linkUrl} target="_blank" rel="noopener noreferrer"
+                           className="text-primary hover:underline block mb-4">
+                            {post.linkUrl}
+                        </a>
+                    )}
+
+                    {post.mediaUrls?.length > 0 && (
+                        <div className="mb-4 space-y-4">
+                            {post.mediaUrls.map((url, i) =>
+                                isVideoUrl(url) ? (
+                                    <video key={i} src={getImageUrl(url)} controls className="rounded-md w-full"/>
+                                ) : (
+                                    <img key={i} src={getImageUrl(url)} className="rounded-md w-full"/>
+                                )
+                            )}
                         </div>
                     )}
 
-                    {/* Media */}
-                    {post.mediaUrls && post.mediaUrls.length > 0 && (
-                        <div className="mb-4 space-y-4">
-                            {post.mediaUrls.map((url, index) => (
-                                isVideoUrl(url) ? (
-                                    <video
-                                        key={index}
-                                        src={getImageUrl(url)}
-                                        controls
-                                        className="rounded-md max-w-full w-full"
-                                    >
-                                        Your browser does not support the video tag.
-                                    </video>
-                                ) : (
-                                    <img
-                                        key={index}
-                                        src={getImageUrl(url)}
-                                        alt={`Post media ${index + 1}`}
-                                        className="rounded-md max-w-full"
-                                    />
-                                )
-                            ))}
-                        </div>
+                    {/* AI Summary */}
+                    {post.body && post.body.trim().length >= 50 && (
+                        <AiSummary postId={post._id} />
                     )}
 
                     <Separator className="my-4"/>
 
-                    {/* Actions */}
                     <div className="flex items-center gap-4">
-                        {/* Vote buttons */}
                         <div className="flex items-center gap-2 bg-muted rounded-full px-2 py-1">
                             <Button variant="ghost" size="icon"
-                                    className="h-8 w-8 rounded-full hover:bg-primary/10 hover:text-primary">
-                                <ArrowBigUp className="h-5 w-5"/>
+                                    className={`${arrowClass(1)} hover:text-orange-500 hover:bg-orange-500/10 transition-colors`}
+                                    onClick={() => handleVote(1)}>
+                                <ArrowBigUp/>
                             </Button>
-                            <span className="text-sm font-semibold min-w-8 text-center">{netVotes}</span>
+                            <span className="font-semibold">{netVotes}</span>
                             <Button variant="ghost" size="icon"
-                                    className="h-8 w-8 rounded-full hover:bg-destructive/10 hover:text-destructive">
-                                <ArrowBigDown className="h-5 w-5"/>
+                                    className={`${arrowClass(-1)} hover:text-purple-500 hover:bg-purple-500/10 transition-colors`}
+                                    onClick={() => handleVote(-1)}>
+                                <ArrowBigDown/>
                             </Button>
                         </div>
 
-                        {/* Comments */}
                         <Button variant="ghost" size="sm" className="gap-2">
                             <MessageSquare className="h-4 w-4"/>
-                            <span>{post.commentCount} Comments</span>
+                            {post.commentCount} Comments
                         </Button>
 
                         {/* Share */}
@@ -185,11 +214,10 @@ export default function PostDetailPage() {
 
             {/* Comments section placeholder */}
             <Card className="mt-4">
-                <CardContent className="p-6 text-center text-muted-foreground">
-                    <p>Comments section coming soon...</p>
+                <CardContent className="p-6">
+                    <CommentSection postId={post._id}/>
                 </CardContent>
             </Card>
         </div>
     );
 }
-
