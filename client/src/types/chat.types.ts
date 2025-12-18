@@ -52,6 +52,33 @@ export type WebSocketMessage =
   | { type: "ERROR"; payload: ErrorPayload }
   | { type: "connected"; userId: string };
 
+// Conversation data from API (matches backend schema)
+export interface Conversation {
+  _id: string;
+  participants: Array<{
+    _id: string;
+    username: string;
+    userPhotoUrl?: string;
+  }>;
+  last_message: string; // Backend stores as plain string
+  updated_at: string;
+  created_at: string;
+}
+
+// User search result from /api/search
+export interface UserSearchResult {
+  _id: string;
+  username: string;
+  userPhotoUrl?: string;
+}
+
+// Standard API response wrapper
+export interface ApiResponse<T> {
+  status: "success" | "fail";
+  data?: T;
+  message?: string;
+}
+
 // Chat context state
 export interface ChatContextState {
   isConnected: boolean;

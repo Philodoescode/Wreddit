@@ -13,6 +13,7 @@ import CreateCommunity from './components/CreateCommunity.tsx'
 import CommunityPage from "./pages/CreateCommunityPage.tsx";
 import PostDetailPage from "./pages/PostDetailPage.tsx";
 import SubmitPage from "./pages/submit.tsx";
+import ChatPage from "./pages/chat-page.tsx";
 
 
 createRoot(document.getElementById('root')!).render(
@@ -29,6 +30,7 @@ createRoot(document.getElementById('root')!).render(
                                 <Route path="r/:communityName" element={<CommunityPage/>}/>
                                 <Route path="posts/:id" element={<PostDetailPage/>}/>
                                 <Route path="submit" element={<SubmitPage/>}/>
+                                <Route path="chat" element={<ChatPage/>}/>
                             </Route>
                         </Routes>
                         <AuthModal/>
