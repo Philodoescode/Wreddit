@@ -1,5 +1,5 @@
 import api from "./api";
-import type { Conversation, UserSearchResult, ApiResponse } from "@/types/chat.types";
+import type { Conversation, UserSearchResult, ApiResponse, MessagesResponse } from "@/types/chat.types";
 
 /**
  * Chat Service
@@ -16,6 +16,21 @@ export const chatService = {
   },
 
   /**
+   * Fetch messages for a conversation with cursor-based pagination
+   * GET /api/chat/messages/:conversationId
+   */
+  getMessages: async (conversationId: string, before?: string): Promise<MessagesResponse> => {
+    const params = new URLSearchParams();
+    if (before) {
+      params.set("before", before);
+    }
+    const queryString = params.toString();
+    const url = `/chat/messages/${conversationId}${queryString ? `?${queryString}` : ""}`;
+    const response = await api.get<ApiResponse<MessagesResponse>>(url);
+    return response.data.data || { messages: [], hasMore: false, nextCursor: null };
+  },
+
+  /**
    * Search for users by username/name
    * GET /api/search?q=<query>
    * Returns both users and communities, we extract users
@@ -28,3 +43,4 @@ export const chatService = {
     return response.data.data?.users || [];
   },
 };
+

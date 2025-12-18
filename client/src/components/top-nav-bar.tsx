@@ -1,10 +1,9 @@
-import { useId } from "react"
-import { MicIcon, PlusIcon, SearchIcon } from "lucide-react"
+import { MessageSquare, PlusIcon } from "lucide-react"
 import { Link } from "react-router-dom"; // Add this import
 
 import ThemeToggle from "@/components/theme-toggle"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+
 import { useAuthModal } from "@/context/auth-modal-provider"
 import { useAuth } from "@/context/auth-provider"
 import Notifications from "@/components/notifications"
@@ -13,7 +12,6 @@ import SearchBar from "@/components/searchBar";
 
 
 export default function NavBar() {
-  const id = useId()
   const { openModal } = useAuthModal();
   const { isAuthenticated } = useAuth();
 
@@ -41,6 +39,11 @@ export default function NavBar() {
           {isAuthenticated ? (
             // Logged In: Show Create Community, Notifications, and Avatar
             <div className="flex items-center gap-3">
+              <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground" asChild>
+                <Link to="/chat" aria-label="Messages">
+                  <MessageSquare className="h-5 w-5" />
+                </Link>
+              </Button>
               <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground" asChild>
                 <Link to="/submit" aria-label="Create post">
                   <PlusIcon className="h-5 w-5" />

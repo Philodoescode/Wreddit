@@ -79,7 +79,6 @@ export interface ApiResponse<T> {
   message?: string;
 }
 
-// Chat context state
 export interface ChatContextState {
   isConnected: boolean;
   isConnecting: boolean;
@@ -91,3 +90,24 @@ export interface ChatContextState {
   onError: (handler: (error: ErrorPayload) => void) => () => void;
   reconnect: () => void;
 }
+
+// Message from chat history API (populated sender)
+export interface Message {
+  _id: string;
+  conversation_id: string;
+  sender_id: {
+    _id: string;
+    username: string;
+    userPhotoUrl?: string;
+  };
+  text: string;
+  created_at: string;
+}
+
+// Response from GET /api/chat/messages/:conversationId
+export interface MessagesResponse {
+  messages: Message[];
+  hasMore: boolean;
+  nextCursor: string | null;
+}
+
