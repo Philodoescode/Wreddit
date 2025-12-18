@@ -49,7 +49,10 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
    */
   const connect = useCallback(() => {
     // Don't connect if already connected or connecting
-    if (wsRef.current?.readyState === WebSocket.OPEN || isConnecting) {
+    if (
+      wsRef.current?.readyState === WebSocket.OPEN ||
+      wsRef.current?.readyState === WebSocket.CONNECTING
+    ) {
       return;
     }
 
@@ -111,7 +114,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       setError("Failed to initialize WebSocket connection");
       setIsConnecting(false);
     }
-  }, [isAuthenticated, token, isConnecting]);
+  }, [isAuthenticated, token]);
 
   /**
    * Disconnect from WebSocket server
@@ -330,16 +333,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [isAuthenticated, token, connect, disconnect]);
 
-  /**
-   * Handle browser refresh/reload - reconnect on mount if authenticated
-   */
-  useEffect(() => {
-    // Check if user was authenticated (token in localStorage)
-    // This is already handled by AuthProvider, so we just need to connect
-    if (isAuthenticated && !isConnected && !isConnecting) {
-      connect();
-    }
-  }, [isAuthenticated, isConnected, isConnecting, connect]);
+
 
   const contextValue: ChatContextState = {
     isConnected,
