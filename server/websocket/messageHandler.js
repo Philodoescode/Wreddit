@@ -6,6 +6,7 @@
 const Message = require("../model/message.model");
 const Conversation = require("../model/conversation.model");
 const mongoose = require("mongoose");
+const { publishMessage } = require("../redis/messageDispatcher");
 
 /**
  * Handle incoming WebSocket messages
@@ -78,6 +79,17 @@ const handleSendMessage = async (ws, payload) => {
     // Step 3: Update conversation with last message
     conversation.last_message = text;
     await conversation.save();
+
+    console.log("Message persisted to Mongo");
+
+    // Step 4: Publish to Redis for delivery to recipient
+    await publishMessage(
+      recipientId,
+      senderId,
+      text,
+      message._id.toString(),
+      message.created_at.toISOString()
+    );
 
     // Send success acknowledgment to sender
     ws.send(

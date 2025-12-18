@@ -7,6 +7,7 @@ const { WebSocketServer } = require("ws");
 const { extractToken, verifyToken } = require("./wsAuth");
 const { addClient, removeClient } = require("./connectedClients");
 const { handleMessage } = require("./messageHandler");
+const { initSubscriber } = require("../redis/messageDispatcher");
 
 /**
  * Initialize WebSocket server and attach to HTTP server
@@ -15,6 +16,9 @@ const { handleMessage } = require("./messageHandler");
  */
 const initWebSocket = (httpServer) => {
   const wss = new WebSocketServer({ noServer: true });
+
+  // Initialize Redis subscriber for message dispatch
+  initSubscriber();
 
   // Handle HTTP upgrade requests
   httpServer.on("upgrade", (request, socket, head) => {
