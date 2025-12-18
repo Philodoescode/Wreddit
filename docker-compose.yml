@@ -11,6 +11,7 @@ services:
       # REVISED: The ?replicaSet=rs0 parameter MUST be removed.
       - MONGO_URI=mongodb://mongo:27017/wreddit
       - JWT_SECRET=dev-secret
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
     depends_on:
       - mongo
 
