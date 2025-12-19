@@ -58,6 +58,11 @@ app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/assets', express.static(path.join(__dirname, 'assets')));
 
+// Swagger Documentation
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpec = require('./config/swagger');
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
 app.use('/api/users', require('./routes/user.routes'));
 app.use('/api/communities', require('./routes/community.routes'));
 app.use('/api/posts', require('./routes/post.routes'));
