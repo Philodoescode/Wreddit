@@ -126,6 +126,18 @@ const getPosts = async (req, res) => {
         if (community) {
             const comm = await Community.findOne({ name: community });
             if (!comm) return res.status(404).json({ status: 'fail', message: 'Community not found' });
+
+            // Block access to private community posts for non-members
+            if (comm.privacyType === 'private') {
+                const subscription = await Subscription.findOne({ user: userId, community: comm._id });
+                if (!subscription) {
+                    return res.status(403).json({
+                        status: 'fail',
+                        message: 'You must be a member to view posts in this private community'
+                    });
+                }
+            }
+
             query.community = comm._id;
         }
 

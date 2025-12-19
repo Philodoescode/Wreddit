@@ -59,10 +59,29 @@ const getCommunityByName = async (req, res) => {
 
         if (!community) return res.status(404).json({message: "Not found"});
 
+        // Check if user is a member
         let isSubscribed = false;
         if (req.user && req.user.id) {
             const subscription = await Subscription.findOne({user: req.user.id, community: community._id});
             isSubscribed = !!subscription;
+        }
+
+        // For private communities, non-members see limited data
+        if (community.privacyType === 'private' && !isSubscribed) {
+            return res.json({
+                status: "success",
+                data: {
+                    _id: community._id,
+                    name: community.name,
+                    title: community.title,
+                    iconImage: community.iconImage,
+                    bannerImage: community.bannerImage,
+                    privacyType: community.privacyType,
+                    memberCount: community.memberCount,
+                    isSubscribed: false,
+                    isPrivate: true
+                }
+            });
         }
 
         const enhancedData = {
@@ -82,6 +101,14 @@ const joinCommunity = async (req, res) => {
         const community = await Community.findOne({name});
         if (!community) {
             return res.status(404).json({status: "fail", message: "Community not found"});
+        }
+
+        // Enforce privacy type restrictions
+        if (community.privacyType === 'private') {
+            return res.status(403).json({
+                status: "fail",
+                message: "This is a private community. You need an invitation to join."
+            });
         }
 
         const existingSubscription = await Subscription.findOne({user: req.user.id, community: community._id});
