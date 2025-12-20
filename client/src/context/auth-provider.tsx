@@ -32,8 +32,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (storedToken && storedUser) {
       setToken(storedToken);
       try {
-        // Axios interceptors might require token setup here later, but for now, setting state is enough
-        setUser(JSON.parse(storedUser));
+        const parsedUser = JSON.parse(storedUser);
+        setUser(parsedUser);
       } catch (e) {
         console.error("Failed to parse stored user data", e);
         // Clear invalid data
@@ -42,6 +42,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     }
   }, []);
+
+  // Effect to validate token with backend immediately
+  useEffect(() => {
+    if (token) {
+      fetch(import.meta.env.VITE_API_URL + "/users/user/me", {
+        headers: { Authorization: `Bearer ${token}` }
+      }).then(res => {
+        if (!res.ok) {
+          if (res.status === 401) {
+            logout();
+          }
+        }
+      }).catch(() => {
+        // Network error - do nothing for now
+      })
+    }
+  }, [token]);
 
   const login = (newToken: string, newUser: User) => {
     setToken(newToken);

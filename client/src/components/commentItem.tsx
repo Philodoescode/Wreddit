@@ -4,6 +4,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { formatTimeAgo } from "@/lib/utils";
 import api from "@/lib/api";
 import type { Comment } from "@/types/comment";
+import { Link } from "react-router-dom";
 
 interface Props {
   comment: Comment;
@@ -46,7 +47,9 @@ export default function CommentItem({
     <div style={{ marginLeft: depth * 24 }} className="mt-4">
       <div className="rounded-md border p-3 bg-muted/40">
         <p className="text-sm font-semibold">
-          u/{comment.userId.username}
+          <Link to={`/user/${comment.userId.username}`} className="hover:underline">
+            u/{comment.userId.username}
+          </Link>
           <span className="ml-2 text-xs text-muted-foreground">
             {formatTimeAgo(comment.createdAt)}
           </span>

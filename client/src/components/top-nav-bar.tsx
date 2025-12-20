@@ -20,13 +20,13 @@ export default function NavBar() {
       <div className="flex h-16 items-center justify-between gap-4">
         {/* Logo */}
         <div className="flex-1">
-          <a href="#" className="text-primary hover:text-primary/90 flex items-center">
+          <Link to="/" className="text-primary hover:text-primary/90 flex items-center">
             <img
               src="/Reddit_Symbol_23.svg"
               alt="Logo"
               className="h-10 w-auto"
             />
-          </a>
+          </Link>
         </div>
 
         {/* Middle area */}

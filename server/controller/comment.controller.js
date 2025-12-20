@@ -95,4 +95,42 @@ const getCommentsByPost = async (req, res) => {
   }
 };
 
-module.exports = { createComment, getCommentsByPost };
+const getCommentsByUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!userId) {
+      return res.status(400).json({ status: 'fail', message: 'User ID is required' });
+    }
+
+    const comments = await Comment.find({ userId })
+      .sort({ createdAt: -1 })
+      .populate('postId', 'title community')
+      .lean();
+
+    // We might want to populate community from the post, but postId population gives us the post object.
+    // Let's populate deeply if needed or just minimal. 
+    // Post structure: title, community (ref). 
+    // We probably want community name too.
+
+    // Better populate:
+    const commentsWithDetails = await Comment.find({ userId })
+      .sort({ createdAt: -1 })
+      .populate({
+        path: 'postId',
+        select: 'title community',
+        populate: { path: 'community', select: 'name iconImage' }
+      })
+      .lean();
+
+    res.status(200).json({
+      status: 'success',
+      results: commentsWithDetails.length,
+      data: commentsWithDetails
+    });
+  } catch (error) {
+    res.status(500).json({ status: 'fail', message: error.message });
+  }
+};
+
+module.exports = { createComment, getCommentsByPost, getCommentsByUser };

@@ -51,4 +51,8 @@ router.get("/conversations", protect, getConversations);
  */
 router.get("/messages/:conversationId", protect, getMessages);
 
+const { getNotifications, markAsRead } = require("../controller/chat.controller");
+router.get("/notifications", protect, getNotifications);
+router.post("/read", protect, markAsRead);
+
 module.exports = router;

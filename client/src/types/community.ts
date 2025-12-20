@@ -20,4 +20,5 @@ export interface Community {
     privacyType?: 'public' | 'restricted' | 'private';
     rules?: CommunityRule[];
     isSubscribed?: boolean;
+    isPrivate?: boolean; // True when viewing a private community as non-member
 }

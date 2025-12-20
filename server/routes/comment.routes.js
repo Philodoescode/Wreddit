@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 
-const { createComment, getCommentsByPost } = require('../controller/comment.controller');
+const { createComment, getCommentsByPost, getCommentsByUser } = require('../controller/comment.controller');
 const { protect } = require('../middleware/auth.middleware');
 
 /**
@@ -104,5 +104,8 @@ router.post('/', protect, createComment);
  *                 $ref: '#/components/schemas/Comment'
  */
 router.get('/:id/comments', getCommentsByPost);
+
+// GET /api/comments/user/:userId -> fetch all comments by a user
+router.get('/user/:userId', getCommentsByUser);
 
 module.exports = router;
