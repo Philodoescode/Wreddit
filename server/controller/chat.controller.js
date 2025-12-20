@@ -118,4 +118,61 @@ const getMessages = async (req, res) => {
   }
 };
 
-module.exports = { getConversations, getMessages };
+const getNotifications = async (req, res) => {
+  try {
+    const userId = req.userId;
+
+    // Find messages where user is NOT the sender AND user is NOT in read_by
+    // We also need to ensure the user is part of the conversation (though usually implied)
+    // Let's filter by conversations user is in.
+
+    // 1. Find conversations user is in
+    const conversations = await Conversation.find({ participants: userId }).select('_id');
+    const conversationIds = conversations.map(c => c._id);
+
+    // 2. Find unread messages in those conversations
+    const unreadMessages = await Message.find({
+      conversation_id: { $in: conversationIds },
+      sender_id: { $ne: userId },
+      read_by: { $ne: userId }
+    })
+      .sort({ created_at: -1 })
+      .limit(20)
+      .populate('sender_id', 'username userPhotoUrl')
+      .populate('conversation_id', 'last_message') // Optional: to get context
+      .lean();
+
+    res.status(200).json({
+      status: 'success',
+      data: { notifications: unreadMessages }
+    });
+
+  } catch (error) {
+    res.status(500).json({ status: 'fail', message: error.message });
+  }
+}
+
+const markAsRead = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { conversationId } = req.body;
+
+    if (!conversationId) {
+      // Mark specific notification/message as read? Or all in a conversation?
+      // Simple: Mark all in conversation as read.
+      return res.status(400).json({ status: 'fail', message: 'Conversation ID required' });
+    }
+
+    await Message.updateMany(
+      { conversation_id: conversationId, read_by: { $ne: userId } },
+      { $addToSet: { read_by: userId } }
+    );
+
+    res.status(200).json({ status: 'success' });
+
+  } catch (error) {
+    res.status(500).json({ status: 'fail', message: error.message });
+  }
+}
+
+module.exports = { getConversations, getMessages, getNotifications, markAsRead };

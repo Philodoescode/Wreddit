@@ -15,4 +15,8 @@ router.get("/conversations", protect, getConversations);
 // GET /api/chat/messages/:conversationId - Get message history (protected)
 router.get("/messages/:conversationId", protect, getMessages);
 
+const { getNotifications, markAsRead } = require("../controller/chat.controller");
+router.get("/notifications", protect, getNotifications);
+router.post("/read", protect, markAsRead);
+
 module.exports = router;

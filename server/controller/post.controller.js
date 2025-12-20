@@ -141,6 +141,11 @@ const getPosts = async (req, res) => {
             query.community = comm._id;
         }
 
+        // Filter by author if provided
+        if (req.query.author) {
+            query.author = req.query.author;
+        }
+
         let posts = await Post.find(query)
             .sort({ createdAt: -1 })
             .skip((pageNum - 1) * limitNum)

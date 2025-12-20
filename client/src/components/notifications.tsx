@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { BellIcon } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -10,166 +10,146 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
+import api from "@/lib/api"
+import { formatTimeAgo } from "@/lib/utils"
+import { useNavigate } from "react-router-dom"
 
-const initialNotifications = [
-  {
-    id: 1,
-    user: "Chris Tompson",
-    action: "requested review on",
-    target: "PR #42: Feature implementation",
-    timestamp: "15 minutes ago",
-    unread: true,
-  },
-  {
-    id: 2,
-    user: "Emma Davis",
-    action: "shared",
-    target: "New component library",
-    timestamp: "45 minutes ago",
-    unread: true,
-  },
-  {
-    id: 3,
-    user: "James Wilson",
-    action: "assigned you to",
-    target: "API integration task",
-    timestamp: "4 hours ago",
-    unread: false,
-  },
-  {
-    id: 4,
-    user: "Alex Morgan",
-    action: "replied to your comment in",
-    target: "Authentication flow",
-    timestamp: "12 hours ago",
-    unread: false,
-  },
-  {
-    id: 5,
-    user: "Sarah Chen",
-    action: "commented on",
-    target: "Dashboard redesign",
-    timestamp: "2 days ago",
-    unread: false,
-  },
-  {
-    id: 6,
-    user: "Miky Derya",
-    action: "mentioned you in",
-    target: "coss.com open graph image",
-    timestamp: "2 weeks ago",
-    unread: false,
-  },
-]
-
-function Dot({ className }: { className?: string }) {
-  return (
-    <svg
-      width="6"
-      height="6"
-      fill="currentColor"
-      viewBox="0 0 6 6"
-      xmlns="http://www.w3.org/2000/svg"
-      className={className}
-      aria-hidden="true"
-    >
-      <circle cx="3" cy="3" r="3" />
-    </svg>
-  )
+interface Notification {
+  _id: string;
+  conversation_id: {
+    _id: string;
+    last_message: string;
+  };
+  sender_id: {
+    _id: string;
+    username: string;
+    userPhotoUrl?: string;
+  };
+  text: string;
+  created_at: string;
 }
 
-export default function Component() {
-  const [notifications, setNotifications] = useState(initialNotifications)
-  const unreadCount = notifications.filter((n) => n.unread).length
+export default function Notifications() {
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const navigate = useNavigate();
+  const unreadCount = notifications.length;
+  // Use a ref to prevent spamming if we implement polling later
+  const intervalRef = useRef<any>(null);
 
-  const handleMarkAllAsRead = () => {
-    setNotifications(
-      notifications.map((notification) => ({
-        ...notification,
-        unread: false,
-      }))
-    )
+  const fetchNotifications = async () => {
+    try {
+      const res = await api.get("/chat/notifications");
+      if (res.data.status === 'success') {
+        setNotifications(res.data.data.notifications);
+      }
+    } catch (err) {
+      console.error("Failed to fetch notifications", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+    // Poll every 30 seconds
+    intervalRef.current = setInterval(fetchNotifications, 30000);
+
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    }
+  }, []);
+
+  const handleMarkAllAsRead = async () => {
+    // Optimistically clear
+    const allIds = notifications.map(n => n.conversation_id?._id).filter(Boolean);
+    const uniqueConvIds = [...new Set(allIds)];
+
+    setNotifications([]);
+
+    // Send requests for each unique conversation
+    uniqueConvIds.forEach(cid => {
+      api.post("/chat/read", { conversationId: cid }).catch(e => console.error(e));
+    });
   }
 
-  const handleNotificationClick = (id: number) => {
-    setNotifications(
-      notifications.map((notification) =>
-        notification.id === id
-          ? { ...notification, unread: false }
-          : notification
-      )
-    )
+  const handleNotificationClick = async (notification: Notification) => {
+    // Navigate to chat
+    navigate(`/chat?conversationId=${notification.conversation_id?._id}`);
+
+    // Mark as read
+    try {
+      await api.post("/chat/read", { conversationId: notification.conversation_id?._id });
+      setNotifications(prev => prev.filter(n => n.conversation_id?._id !== notification.conversation_id?._id));
+    } catch (err) {
+      console.error("Failed to mark read", err);
+    }
   }
 
   return (
     <Popover>
       <PopoverTrigger asChild>
         <div className="relative inline-block">
-        <Button
-          size="icon"
-          variant="outline"
-          className="relative border-transparent"
-          aria-label="Open notifications"
-        > 
-          <BellIcon size={16} aria-hidden="true" />
-          {unreadCount > 0 && (
-            <Badge className="absolute -top-2 left-full min-w-5 -translate-x-1/2 px-1">
-              {unreadCount > 99 ? "99+" : unreadCount}
-            </Badge>
-          )}
-        </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="relative text-muted-foreground hover:text-foreground"
+            aria-label="Open notifications"
+          >
+            <BellIcon size={20} aria-hidden="true" />
+            {unreadCount > 0 && (
+              <Badge className="absolute -top-1 -right-1 min-w-4 h-4 p-0 flex items-center justify-center text-[10px] bg-red-500 hover:bg-red-600">
+                {unreadCount > 99 ? "99+" : unreadCount}
+              </Badge>
+            )}
+          </Button>
         </div>
       </PopoverTrigger>
-      <PopoverContent className="w-80 p-1">
-        <div className="flex items-baseline justify-between gap-4 px-3 py-2">
-          <div className="text-sm font-semibold">Notifications</div>
+      <PopoverContent className="w-80 p-0" align="end">
+        <div className="flex items-center justify-between px-4 py-3 border-b">
+          <div className="font-semibold">Notifications</div>
           {unreadCount > 0 && (
-            <button
-              className="text-xs font-medium hover:underline"
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs h-auto p-1"
               onClick={handleMarkAllAsRead}
             >
               Mark all as read
-            </button>
+            </Button>
           )}
         </div>
-        <div
-          role="separator"
-          aria-orientation="horizontal"
-          className="-mx-1 my-1 h-px bg-border"
-        ></div>
-        {notifications.map((notification) => (
-          <div
-            key={notification.id}
-            className="rounded-md px-3 py-2 text-sm transition-colors hover:bg-accent"
-          >
-            <div className="relative flex items-start pe-3">
-              <div className="flex-1 space-y-1">
-                <button
-                  className="text-left text-foreground/80 after:absolute after:inset-0"
-                  onClick={() => handleNotificationClick(notification.id)}
-                >
-                  <span className="font-medium text-foreground hover:underline">
-                    {notification.user}
-                  </span>{" "}
-                  {notification.action}{" "}
-                  <span className="font-medium text-foreground hover:underline">
-                    {notification.target}
-                  </span>
-                  .
-                </button>
-                <div className="text-xs text-muted-foreground">
-                  {notification.timestamp}
+
+        <div className="max-h-[300px] overflow-y-auto">
+          {notifications.length === 0 ? (
+            <div className="p-8 text-center text-sm text-muted-foreground">
+              No new notifications
+            </div>
+          ) : (
+            notifications.map((notification) => (
+              <div
+                key={notification._id}
+                className="flex items-start gap-3 p-3 text-sm hover:bg-muted/50 cursor-pointer border-b last:border-0"
+                onClick={() => handleNotificationClick(notification)}
+              >
+                <div className="mt-1">
+                  <div className="h-2 w-2 rounded-full bg-blue-500" />
+                </div>
+                <div className="flex-1 space-y-1">
+                  <p className="font-medium leading-none">
+                    {notification.sender_id.username}
+                    <span className="font-normal text-muted-foreground ml-1">
+                      sent you a message
+                    </span>
+                  </p>
+                  <p className="text-xs text-muted-foreground line-clamp-2">
+                    {notification.text}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {formatTimeAgo(notification.created_at)}
+                  </p>
                 </div>
               </div>
-              {notification.unread && (
-                <div className="absolute end-0 self-center">
-                  <span className="sr-only">Unread</span>
-                  <Dot />
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
+            ))
+          )}
+        </div>
       </PopoverContent>
     </Popover>
   )
