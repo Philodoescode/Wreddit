@@ -57,6 +57,7 @@ export default function CommunityPage() {
 
     const getButtonText = () => {
         if (isOwner) return "Owner";
+        if (community?.privacyType === 'private' && !isJoined) return "Private";
         return isJoined ? "Leave" : "Join";
     };
 
@@ -64,10 +65,19 @@ export default function CommunityPage() {
         if (isOwner) {
             return "bg-muted text-muted-foreground cursor-not-allowed";
         }
+        if (community?.privacyType === 'private' && !isJoined) {
+            return "bg-muted text-muted-foreground cursor-not-allowed";
+        }
         if (isJoined) {
             return "border border-destructive text-destructive hover:bg-destructive hover:text-white";
         }
         return "bg-primary text-primary-foreground hover:bg-primary/90";
+    };
+
+    const canJoin = () => {
+        if (isOwner) return false;
+        if (community?.privacyType === 'private' && !isJoined) return false;
+        return true;
     };
 
     return (
@@ -87,11 +97,20 @@ export default function CommunityPage() {
                         </div>
                         <p className="text-sm mb-2">Created by u/{community.creator?.username ?? "unknown"}</p>
                         <p className="text-sm mb-4 font-semibold">{community.memberCount || 0} Members</p>
-                        <p className="text-sm capitalize mb-4">{community.privacyType}</p>
+                        <p className="text-sm capitalize mb-4">
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                                community.privacyType === 'private' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                                community.privacyType === 'restricted' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                                'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                            }`}>
+                                {community.privacyType === 'private' ? '🔒' : community.privacyType === 'restricted' ? '🔐' : '🌐'}
+                                {community.privacyType}
+                            </span>
+                        </p>
 
                         <button
                             onClick={handleJoinToggle}
-                            disabled={isOwner}
+                            disabled={!canJoin()}
                             className={`w-full rounded px-4 py-2 font-medium transition-colors ${getButtonStyles()}`}
                         >
                             {getButtonText()}

@@ -16,7 +16,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import ProfileEditForm from "@/components/ProfileEditForm";
-import { useAuth } from "@/context/auth-provider"; 
+import { useAuth } from "@/context/auth-provider";
+import PostsTab from "@/components/PostsTab";
+import CommentsTab from "@/components/CommentsTab";
 
 interface UserProfile {
   id: string;
@@ -68,18 +70,18 @@ export default function ProfilePage() {
   }, [username]);
 
   const handleSaveProfile = async (data: any) => {
-  setSaving(true);
-  try {
-    // THIS IS THE CORRECT ENDPOINT
-    const response = await api.patch("/users/user/me", data);
-    setUser(response.data.data.user);
-    setEditing(false);
-  } catch (err: any) {
-    alert(err.response?.data?.message || "Failed to save profile");
-  } finally {
-    setSaving(false);
-  }
-};
+    setSaving(true);
+    try {
+      // THIS IS THE CORRECT ENDPOINT
+      const response = await api.patch("/users/user/me", data);
+      setUser(response.data.data.user);
+      setEditing(false);
+    } catch (err: any) {
+      alert(err.response?.data?.message || "Failed to save profile");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -96,25 +98,25 @@ export default function ProfilePage() {
     }
   };
 
-const handleBannerChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-  const file = e.target.files?.[0];
-  if (!file || !isOwnProfile) return;
+  const handleBannerChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !isOwnProfile) return;
 
-  const formData = new FormData();
-  formData.append("banner", file);
+    const formData = new FormData();
+    formData.append("banner", file);
 
-  // ADD THIS DEBUG LINE
-  console.log("Using api instance:", api);
-  console.log("Current token:", localStorage.getItem("token"));
+    // ADD THIS DEBUG LINE
+    console.log("Using api instance:", api);
+    console.log("Current token:", localStorage.getItem("token"));
 
-  try {
-    const res = await api.patch("/users/user/me/banner", formData);
-    setUser(res.data.data.user);
-  } catch (err: any) {
-    console.error("Banner upload failed:", err.response?.status, err.response?.data);
-    alert("Failed to upload banner");
-  }
-};
+    try {
+      const res = await api.patch("/users/user/me/banner", formData);
+      setUser(res.data.data.user);
+    } catch (err: any) {
+      console.error("Banner upload failed:", err.response?.status, err.response?.data);
+      alert("Failed to upload banner");
+    }
+  };
 
 
   if (loading) {
@@ -208,10 +210,10 @@ const handleBannerChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
                     Edit Profile
                   </Button>
                 ) : currentUser && (
-                  <Button 
+                  <Button
                     onClick={() => navigate(`/chat?newChat=${user.id}`)}
                     variant="outline"
-                    size="sm" 
+                    size="sm"
                     className="gap-2"
                   >
                     <MessageCircle className="w-4 h-4" />
@@ -254,19 +256,22 @@ const handleBannerChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
               <TabsTrigger value="posts">Posts</TabsTrigger>
               <TabsTrigger value="comments">Comments</TabsTrigger>
             </TabsList>
+
             <TabsContent value="overview" className="mt-6">
               <Card>
                 <CardHeader><CardTitle>Recent Activity</CardTitle></CardHeader>
                 <CardContent className="text-center text-muted-foreground py-12">
-                  No activity yet.
+                  Check the Posts and Comments tabs for activity.
                 </CardContent>
               </Card>
             </TabsContent>
+
             <TabsContent value="posts">
-              <Card><CardContent className="pt-6 text-center text-muted-foreground">No posts yet.</CardContent></Card>
+              <PostsTab userId={user.id} />
             </TabsContent>
+
             <TabsContent value="comments">
-              <Card><CardContent className="pt-6 text-center text-muted-foreground">No comments yet.</CardContent></Card>
+              <CommentsTab userId={user.id} />
             </TabsContent>
           </Tabs>
         </div>
