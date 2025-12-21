@@ -18,7 +18,8 @@ const CHANNEL = "global_dispatch";
  * @param {string} timestamp - Message creation timestamp (ISO string)
  */
 const publishMessage = async (targetId, senderId, text, messageId, timestamp) => {
-  const event = JSON.stringify({
+  // Publish to recipient
+  const recipientEvent = JSON.stringify({
     type: "MESSAGE",
     target_id: targetId,
     sender_id: senderId,
@@ -26,9 +27,74 @@ const publishMessage = async (targetId, senderId, text, messageId, timestamp) =>
     message_id: messageId,
     timestamp,
   });
+  await publisher.publish(CHANNEL, recipientEvent);
 
-  await publisher.publish(CHANNEL, event);
-  console.log("Message event published to Redis");
+  // Also publish to sender (so they see their own message in real-time)
+  const senderEvent = JSON.stringify({
+    type: "MESSAGE",
+    target_id: senderId,
+    sender_id: senderId,
+    text,
+    message_id: messageId,
+    timestamp,
+  });
+  await publisher.publish(CHANNEL, senderEvent);
+
+  console.log("Message event published to Redis for both sender and recipient");
+};
+
+/**
+ * Send initial presence info to a newly connected user
+ * Notifies them which of their chat partners are currently online
+ * @param {string} userId - Newly connected user ID
+ */
+const sendInitialPresence = async (userId) => {
+  try {
+    // Get all chat partners for this user
+    const conversations = await Conversation.find(
+      { participants: userId },
+      { participants: 1 }
+    ).lean();
+
+    // Extract unique partner IDs (exclude self)
+    const partners = [
+      ...new Set(
+        conversations.flatMap((c) =>
+          c.participants
+            .map((p) => p.toString())
+            .filter((p) => p !== userId)
+        )
+      ),
+    ];
+
+    if (partners.length === 0) {
+      console.log(`No chat partners for user ${userId}, skipping initial presence`);
+      return;
+    }
+
+    // Check which partners are currently connected
+    const userSocket = getClient(userId);
+    if (!userSocket || userSocket.readyState !== 1) {
+      return;
+    }
+
+    // Send USER_STATUS for each online partner to the newly connected user
+    for (const partnerId of partners) {
+      const partnerSocket = getClient(partnerId);
+      const isOnline = partnerSocket && partnerSocket.readyState === 1;
+      
+      userSocket.send(
+        JSON.stringify({
+          type: "USER_STATUS",
+          payload: { userId: partnerId, status: isOnline ? "online" : "offline" },
+        })
+      );
+    }
+
+    console.log(`Initial presence sent to user ${userId} for ${partners.length} partners`);
+  } catch (error) {
+    console.error("Failed to send initial presence:", error.message);
+  }
 };
 
 /**
@@ -158,5 +224,5 @@ const handleMessageDelivery = (data) => {
   }
 };
 
-module.exports = { publishMessage, publishPresence, initSubscriber };
+module.exports = { publishMessage, publishPresence, initSubscriber, sendInitialPresence };
 
