@@ -21,6 +21,7 @@ const getConversations = async (req, res) => {
     })
       .sort({ updated_at: -1 })
       .populate("participants", "username userPhotoUrl")
+      .populate("last_message_sender", "username")
       .lean();
 
     return res.status(200).json({

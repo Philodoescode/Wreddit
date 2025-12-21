@@ -61,6 +61,10 @@ export interface Conversation {
     userPhotoUrl?: string;
   }>;
   last_message: string; // Backend stores as plain string
+  last_message_sender?: {
+    _id: string;
+    username: string;
+  } | null;
   updated_at: string;
   created_at: string;
 }

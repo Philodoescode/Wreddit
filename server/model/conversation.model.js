@@ -14,6 +14,11 @@ const ConversationSchema = new Schema(
       type: String,
       default: "",
     },
+    last_message_sender: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
   },
   {
     timestamps: { createdAt: "created_at", updatedAt: "updated_at" },

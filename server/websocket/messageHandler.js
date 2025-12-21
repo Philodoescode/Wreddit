@@ -76,8 +76,9 @@ const handleSendMessage = async (ws, payload) => {
       text: text,
     });
 
-    // Step 3: Update conversation with last message
+    // Step 3: Update conversation with last message and sender
     conversation.last_message = text;
+    conversation.last_message_sender = senderId;
     await conversation.save();
 
     console.log("Message persisted to Mongo");
