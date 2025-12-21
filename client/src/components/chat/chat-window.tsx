@@ -44,7 +44,14 @@ export function ChatWindow({ conversation, currentUserId, isOnline = false, onCo
   }
 
   const handleSendMessage = (text: string) => {
-    sendMessage(otherParticipant._id, text);
+    // Use MessageFeed's sendMessage which includes optimistic UI updates
+    const chatSendMessage = (window as any).__chatSendMessage;
+    if (chatSendMessage) {
+      chatSendMessage(text);
+    } else {
+      // Fallback to direct send if MessageFeed not mounted
+      sendMessage(otherParticipant._id, text);
+    }
   };
 
   return (
