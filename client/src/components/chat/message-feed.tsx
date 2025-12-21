@@ -324,7 +324,7 @@ export function MessageFeed({ conversationId, recipientId, onConversationResolve
   const groupedMessages = groupMessages(messages, user?.id || "");
 
   return (
-    <div className="relative flex-1 flex flex-col">
+    <div className="relative flex-1 flex flex-col overflow-hidden min-h-0">
       <ScrollArea ref={scrollAreaRef} className="flex-1">
         <div className="py-4">
           {/* Load more button */}

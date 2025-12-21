@@ -55,7 +55,7 @@ export function ChatWindow({ conversation, currentUserId, isOnline = false, onCo
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-background">
+    <div className="flex-1 flex flex-col bg-background overflow-hidden min-h-0">
       {/* Chat header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b bg-background">
         <OnlineAvatar
