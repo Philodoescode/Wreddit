@@ -52,8 +52,25 @@ export interface TypingEventPayload {
   timestamp: string;
 }
 
+// Authentication payloads
+export interface AuthenticatePayload {
+  token: string;
+}
+
+export interface AuthSuccessPayload {
+  userId: string;
+}
+
+export interface AuthErrorPayload {
+  code: string;
+  message: string;
+}
+
 // WebSocket message envelope types
 export type WebSocketMessage =
+  | { type: "AUTHENTICATE"; payload: AuthenticatePayload }
+  | { type: "AUTH_SUCCESS"; payload: AuthSuccessPayload }
+  | { type: "AUTH_ERROR"; payload: AuthErrorPayload }
   | { type: "SEND_MESSAGE"; payload: SendMessagePayload }
   | { type: "NEW_MESSAGE"; payload: NewMessagePayload }
   | { type: "MESSAGE_SENT"; payload: MessageSentPayload }

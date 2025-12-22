@@ -1,13 +1,17 @@
 /**
  * WebSocket Server Module
  * Handles WebSocket server initialization and connection management
+ * Uses message-based authentication for security (token not exposed in URL)
  */
 
 const { WebSocketServer } = require("ws");
-const { extractToken, verifyToken } = require("./wsAuth");
+const { verifyToken } = require("./wsAuth");
 const { addClient, removeClient } = require("./connectedClients");
 const { handleMessage } = require("./messageHandler");
 const { initSubscriber, publishPresence, sendInitialPresence } = require("../redis/messageDispatcher");
+
+// Authentication timeout in milliseconds (10 seconds)
+const AUTH_TIMEOUT_MS = 10000;
 
 /**
  * Initialize WebSocket server and attach to HTTP server
@@ -20,66 +24,123 @@ const initWebSocket = (httpServer) => {
   // Initialize Redis subscriber for message dispatch
   initSubscriber();
 
-  // Handle HTTP upgrade requests
+  // Handle HTTP upgrade requests - accept all connections initially
   httpServer.on("upgrade", (request, socket, head) => {
-    // Extract and verify token before completing upgrade
-    const token = extractToken(request.url);
-
-    try {
-      const { userId } = verifyToken(token);
-
-      // Token is valid, complete the WebSocket handshake
-      wss.handleUpgrade(request, socket, head, (ws) => {
-        // Attach userId to the WebSocket instance
-        ws.userId = userId;
-        wss.emit("connection", ws, request);
-      });
-    } catch (error) {
-      // Token is invalid or expired - reject the connection
-      console.log(`WebSocket auth failed: ${error.message}`);
-      socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
-      socket.destroy();
-    }
+    // Complete the WebSocket handshake without token validation
+    // Authentication will happen via the first message
+    wss.handleUpgrade(request, socket, head, (ws) => {
+      wss.emit("connection", ws, request);
+    });
   });
 
   // Handle new connections
   wss.on("connection", (ws) => {
-    const userId = ws.userId;
+    // Mark connection as unauthenticated initially
+    ws.isAuthenticated = false;
+    ws.userId = null;
 
-    // Register client in the connected clients map
-    addClient(userId, ws);
-    console.log(`User ${userId} connected.`);
-
-    // Send initial presence info (which chat partners are online) to the newly connected user
-    sendInitialPresence(userId);
-
-    // Publish online presence to chat partners (non-blocking)
-    publishPresence(userId, "online");
+    // Set authentication timeout - close if not authenticated in time
+    const authTimeout = setTimeout(() => {
+      if (!ws.isAuthenticated) {
+        console.log("Authentication timeout - closing connection");
+        ws.close(4001, "Authentication timeout");
+      }
+    }, AUTH_TIMEOUT_MS);
 
     // Handle incoming messages
-    ws.on("message", (data) => {
+    ws.on("message", async (data) => {
+      // If not authenticated, only accept AUTHENTICATE messages
+      if (!ws.isAuthenticated) {
+        try {
+          const message = JSON.parse(data.toString());
+
+          if (message.type === "AUTHENTICATE") {
+            const token = message.payload?.token;
+
+            if (!token) {
+              ws.send(JSON.stringify({
+                type: "AUTH_ERROR",
+                payload: { code: "NO_TOKEN", message: "No token provided" }
+              }));
+              ws.close(4002, "No token provided");
+              clearTimeout(authTimeout);
+              return;
+            }
+
+            try {
+              const { userId } = verifyToken(token);
+              
+              // Authentication successful
+              ws.isAuthenticated = true;
+              ws.userId = userId;
+              clearTimeout(authTimeout);
+
+              // Register client in the connected clients map
+              addClient(userId, ws);
+              console.log(`User ${userId} connected and authenticated.`);
+
+              // Send initial presence info to the newly connected user
+              sendInitialPresence(userId);
+
+              // Publish online presence to chat partners
+              publishPresence(userId, "online");
+
+              // Send auth success acknowledgment
+              ws.send(JSON.stringify({
+                type: "AUTH_SUCCESS",
+                payload: { userId }
+              }));
+
+            } catch (error) {
+              console.log(`Authentication failed: ${error.message}`);
+              ws.send(JSON.stringify({
+                type: "AUTH_ERROR",
+                payload: { code: "INVALID_TOKEN", message: "Invalid or expired token" }
+              }));
+              ws.close(4003, "Invalid token");
+              clearTimeout(authTimeout);
+            }
+          } else {
+            // Non-AUTHENTICATE message before authentication
+            ws.send(JSON.stringify({
+              type: "ERROR",
+              payload: { code: "NOT_AUTHENTICATED", message: "Must authenticate first" }
+            }));
+          }
+        } catch (error) {
+          ws.send(JSON.stringify({
+            type: "ERROR",
+            payload: { code: "INVALID_JSON", message: "Failed to parse message as JSON" }
+          }));
+        }
+        return;
+      }
+
+      // Authenticated - handle message normally
       handleMessage(ws, data);
     });
 
     // Handle client disconnection
     ws.on("close", () => {
-      removeClient(userId);
-      console.log(`User ${userId} disconnected.`);
+      clearTimeout(authTimeout);
+      
+      if (ws.isAuthenticated && ws.userId) {
+        removeClient(ws.userId);
+        console.log(`User ${ws.userId} disconnected.`);
 
-      // Publish offline presence to chat partners (non-blocking)
-      publishPresence(userId, "offline");
+        // Publish offline presence to chat partners
+        publishPresence(ws.userId, "offline");
+      }
     });
 
     // Handle errors
     ws.on("error", (error) => {
-      console.error(`WebSocket error for user ${userId}:`, error.message);
+      clearTimeout(authTimeout);
+      console.error(`WebSocket error:`, error.message);
     });
-
-    // Optional: Send a welcome message
-    ws.send(JSON.stringify({ type: "connected", userId }));
   });
 
-  console.log("WebSocket server initialized");
+  console.log("WebSocket server initialized (message-based auth)");
   return wss;
 };
 

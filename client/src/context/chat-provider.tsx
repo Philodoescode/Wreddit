@@ -47,6 +47,9 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const userStoppedTypingHandlersRef = useRef<Set<(event: TypingEventPayload) => void>>(new Set());
   const errorHandlersRef = useRef<Set<(error: ErrorPayload) => void>>(new Set());
 
+  // Ref to store startHeartbeat function for use in handlers without dependency issues
+  const startHeartbeatRef = useRef<() => void>(() => {});
+
   /**
    * Connect to WebSocket server with JWT token
    */
@@ -70,19 +73,16 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     isIntentionalCloseRef.current = false;
 
     try {
-      // Append JWT token to WebSocket URL as query parameter
-      const wsUrl = `${WS_URL}?token=${encodeURIComponent(token)}`;
-      const ws = new WebSocket(wsUrl);
+      // Connect without token in URL (security: avoid token in logs)
+      const ws = new WebSocket(WS_URL);
 
       ws.onopen = () => {
-        console.log("WebSocket connected");
-        setIsConnected(true);
-        setIsConnecting(false);
-        setError(null);
-        reconnectAttemptsRef.current = 0;
-
-        // Start heartbeat to keep connection alive
-        startHeartbeat();
+        console.log("WebSocket connected, sending authentication...");
+        // Send authentication message with token
+        ws.send(JSON.stringify({
+          type: "AUTHENTICATE",
+          payload: { token }
+        }));
       };
 
       ws.onmessage = (event) => {
@@ -120,6 +120,35 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   }, [isAuthenticated, token]);
 
   /**
+   * Stop heartbeat
+   */
+  const stopHeartbeat = useCallback(() => {
+    if (heartbeatIntervalRef.current !== null) {
+      clearInterval(heartbeatIntervalRef.current);
+      heartbeatIntervalRef.current = null;
+    }
+  }, []);
+
+  /**
+   * Start sending periodic heartbeat/ping to keep connection alive
+   */
+  const startHeartbeat = useCallback(() => {
+    stopHeartbeat(); // Clear any existing heartbeat
+
+    heartbeatIntervalRef.current = window.setInterval(() => {
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        console.log("Heartbeat: Connection alive");
+      } else {
+        console.log("Heartbeat: Connection lost");
+        stopHeartbeat();
+      }
+    }, HEARTBEAT_INTERVAL);
+  }, [stopHeartbeat]);
+
+  // Update ref so handleIncomingMessage can use it without dependency issues
+  startHeartbeatRef.current = startHeartbeat;
+
+  /**
    * Disconnect from WebSocket server
    */
   const disconnect = useCallback(() => {
@@ -134,13 +163,30 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
 
     setIsConnected(false);
     setIsConnecting(false);
-  }, []);
+  }, [stopHeartbeat]);
 
   /**
    * Handle incoming WebSocket messages and route to appropriate handlers
    */
   const handleIncomingMessage = useCallback((message: WebSocketMessage) => {
     switch (message.type) {
+      case "AUTH_SUCCESS":
+        // Authentication successful - now fully connected
+        console.log("Authentication successful for user:", message.payload?.userId);
+        setIsConnected(true);
+        setIsConnecting(false);
+        setError(null);
+        reconnectAttemptsRef.current = 0;
+        startHeartbeatRef.current();
+        break;
+
+      case "AUTH_ERROR":
+        // Authentication failed
+        console.error("Authentication failed:", message.payload?.message);
+        setError(message.payload?.message || "Authentication failed");
+        setIsConnecting(false);
+        break;
+
       case "NEW_MESSAGE":
         // Notify all registered new message handlers
         newMessageHandlersRef.current.forEach((handler) => handler(message.payload));
@@ -173,6 +219,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         break;
 
       case "connected":
+        // Legacy handler - can be removed after testing
         console.log("Connection acknowledged by server for user:", message.userId);
         break;
 
@@ -248,35 +295,6 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     },
     []
   );
-
-  /**
-   * Start sending periodic heartbeat/ping to keep connection alive
-   */
-  const startHeartbeat = useCallback(() => {
-    stopHeartbeat(); // Clear any existing heartbeat
-
-    heartbeatIntervalRef.current = window.setInterval(() => {
-      if (wsRef.current?.readyState === WebSocket.OPEN) {
-        // Send a ping message (you can customize this based on your server)
-        // For now, we just check the connection state
-        // If your server supports ping frames, you can use ws.ping() instead
-        console.log("Heartbeat: Connection alive");
-      } else {
-        console.log("Heartbeat: Connection lost");
-        stopHeartbeat();
-      }
-    }, HEARTBEAT_INTERVAL);
-  }, []);
-
-  /**
-   * Stop heartbeat
-   */
-  const stopHeartbeat = useCallback(() => {
-    if (heartbeatIntervalRef.current !== null) {
-      clearInterval(heartbeatIntervalRef.current);
-      heartbeatIntervalRef.current = null;
-    }
-  }, []);
 
   /**
    * Attempt to reconnect with exponential backoff
