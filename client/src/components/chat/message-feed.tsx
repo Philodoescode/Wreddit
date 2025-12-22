@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, ChevronDown } from "lucide-react";
 import { MessageBubble } from "./message-bubble";
-import { DateDivider } from "./date-divider";
+import { DateDivider, formatDateLabel } from "./date-divider";
 import { chatService } from "@/lib/chat-service";
 import { useChat } from "@/context/chat-provider";
 import { useAuth } from "@/context/auth-provider";
@@ -14,6 +14,11 @@ import type { Message, MessageStatus } from "@/types/chat.types";
 interface MessageFeedProps {
   conversationId: string;
   recipientId: string;
+  recipient: {
+    _id: string;
+    username: string;
+    userPhotoUrl?: string;
+  };
   onConversationResolved?: (pendingId: string, realId: string) => void;
 }
 
@@ -66,7 +71,7 @@ function groupMessages(messages: DisplayMessage[], currentUserId: string) {
   });
 }
 
-export function MessageFeed({ conversationId, recipientId, onConversationResolved }: MessageFeedProps) {
+export function MessageFeed({ conversationId, recipientId, recipient, onConversationResolved }: MessageFeedProps) {
   const { user } = useAuth();
   const { onNewMessage, onMessageSent, sendMessage } = useChat();
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
@@ -85,6 +90,10 @@ export function MessageFeed({ conversationId, recipientId, onConversationResolve
   const bottomRef = useRef<HTMLDivElement>(null);
   const isFirstLoad = useRef(true);
   const pendingMessages = useRef<Map<string, { text: string; recipientId: string }>>(new Map());
+  
+  // Sticky date header state
+  const [stickyDate, setStickyDate] = useState<Date | null>(null);
+  const dateRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   // Generate unique local ID
   const generateLocalId = () => `local_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -112,6 +121,84 @@ export function MessageFeed({ conversationId, recipientId, onConversationResolve
       return () => scrollViewport.removeEventListener('scroll', handleScroll);
     }
   }, [handleScroll, isLoading]);
+
+  // Collect all unique dates from messages for sticky header tracking
+  const uniqueDates = useMemo(() => {
+    const dates: { key: string; date: Date }[] = [];
+    let prevDateStr = "";
+    messages.forEach((msg) => {
+      const date = new Date(msg.created_at);
+      const dateStr = date.toDateString();
+      if (dateStr !== prevDateStr) {
+        dates.push({ key: dateStr, date });
+        prevDateStr = dateStr;
+      }
+    });
+    return dates;
+  }, [messages]);
+
+  // IntersectionObserver for sticky date headers
+  useEffect(() => {
+    const scrollViewport = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]');
+    if (!scrollViewport || uniqueDates.length === 0) return;
+
+    const observer = new IntersectionObserver(
+      (_entries) => {
+        // Find the topmost visible date divider
+        let topmostDate: Date | null = null;
+        let topmostTop = Infinity;
+
+        dateRefs.current.forEach((element, key) => {
+          const rect = element.getBoundingClientRect();
+          const viewportRect = scrollViewport.getBoundingClientRect();
+          // Check if this date divider is at or above the top of the viewport
+          if (rect.top <= viewportRect.top + 50) {
+            // Find the closest one to the top
+            if (rect.top > topmostTop || topmostDate === null) {
+              topmostDate = new Date(key);
+              topmostTop = rect.top;
+            }
+          }
+        });
+
+        setStickyDate(topmostDate);
+      },
+      {
+        root: scrollViewport,
+        rootMargin: "-10px 0px 0px 0px",
+        threshold: [0, 0.1, 0.5, 1],
+      }
+    );
+
+    // Observe all date divider elements
+    dateRefs.current.forEach((element) => {
+      observer.observe(element);
+    });
+
+    // Initial check on scroll
+    const handleStickyScroll = () => {
+      let topmostDate: Date | null = null;
+      let topmostTop = -Infinity;
+
+      dateRefs.current.forEach((element, key) => {
+        const rect = element.getBoundingClientRect();
+        const viewportRect = scrollViewport.getBoundingClientRect();
+        if (rect.top <= viewportRect.top + 50 && rect.top > topmostTop) {
+          topmostDate = new Date(key);
+          topmostTop = rect.top;
+        }
+      });
+
+      setStickyDate(topmostDate);
+    };
+
+    scrollViewport.addEventListener('scroll', handleStickyScroll);
+
+    return () => {
+      observer.disconnect();
+      scrollViewport.removeEventListener('scroll', handleStickyScroll);
+    };
+  }, [uniqueDates, isLoading]);
 
   // Scroll to bottom function
   const scrollToBottom = useCallback(() => {
@@ -203,7 +290,8 @@ export function MessageFeed({ conversationId, recipientId, onConversationResolve
           conversation_id: conversationId,
           sender_id: {
             _id: payload.sender_id,
-            username: "", // Will be populated from context if needed
+            username: recipient.username,
+            userPhotoUrl: recipient.userPhotoUrl,
           },
           text: payload.text,
           created_at: payload.timestamp,
@@ -225,7 +313,7 @@ export function MessageFeed({ conversationId, recipientId, onConversationResolve
     });
 
     return unsubscribe;
-  }, [onNewMessage, conversationId, recipientId, isAtBottom]);
+  }, [onNewMessage, conversationId, recipientId, recipient, isAtBottom]);
 
   // Handle sent message acknowledgment - update optimistic message
   useEffect(() => {
@@ -324,9 +412,19 @@ export function MessageFeed({ conversationId, recipientId, onConversationResolve
   const groupedMessages = groupMessages(messages, user?.id || "");
 
   return (
-    <div className="relative flex-1 flex flex-col">
-      <ScrollArea ref={scrollAreaRef} className="flex-1">
-        <div className="py-4">
+    <div className="relative flex-1 flex flex-col overflow-hidden min-h-0">
+      {/* Sticky date header */}
+      {stickyDate && (
+        <div className="absolute top-0 left-0 right-0 z-20 bg-background/95 backdrop-blur-sm border-b">
+          <div className="flex items-center justify-center py-2">
+            <span className="text-xs text-muted-foreground font-medium px-3 py-1 bg-muted rounded-full">
+              {formatDateLabel(stickyDate)}
+            </span>
+          </div>
+        </div>
+      )}
+      <ScrollArea ref={scrollAreaRef} className="flex-1 h-full">
+        <div className={`py-4 ${stickyDate ? 'pt-12' : ''}`}>
           {/* Load more button */}
           {hasMore && (
             <div className="flex justify-center pb-4">
@@ -361,21 +459,34 @@ export function MessageFeed({ conversationId, recipientId, onConversationResolve
               isFirstInGroup,
               isLastInGroup,
               showAvatar,
-            }) => (
-              <div key={message._id}>
-                {showDateDivider && (
-                  <DateDivider date={new Date(message.created_at)} />
-                )}
-                <MessageBubble
-                  message={message}
-                  isSent={isSent}
-                  showAvatar={showAvatar}
+            }) => {
+              const messageDate = new Date(message.created_at);
+              const dateKey = messageDate.toDateString();
+              return (
+                <div key={message._id}>
+                  {showDateDivider && (
+                    <div
+                      ref={(el) => {
+                        if (el) {
+                          dateRefs.current.set(dateKey, el);
+                        }
+                      }}
+                      data-date={dateKey}
+                    >
+                      <DateDivider date={messageDate} />
+                    </div>
+                  )}
+                  <MessageBubble
+                    message={message}
+                    isSent={isSent}
+                    showAvatar={showAvatar}
                   isFirstInGroup={isFirstInGroup}
                   isLastInGroup={isLastInGroup}
                   status={message.status}
                 />
-              </div>
-            ))
+                </div>
+              );
+            })
           )}
 
           {/* Scroll anchor */}

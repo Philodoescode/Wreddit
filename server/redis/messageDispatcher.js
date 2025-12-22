@@ -9,6 +9,10 @@ const Conversation = require("../model/conversation.model");
 
 const CHANNEL = "global_dispatch";
 
+// Typing state management: Map<`${conversationId}:${userId}`, { timeoutId, userName }>
+const typingStates = new Map();
+const TYPING_TIMEOUT = 6000; // 6 seconds auto-clear
+
 /**
  * Publish a message event to Redis for delivery
  * @param {string} targetId - Recipient user ID
@@ -16,19 +20,162 @@ const CHANNEL = "global_dispatch";
  * @param {string} text - Message text
  * @param {string} messageId - MongoDB message ID
  * @param {string} timestamp - Message creation timestamp (ISO string)
+ * @param {string} conversationId - Conversation ID
  */
-const publishMessage = async (targetId, senderId, text, messageId, timestamp) => {
-  const event = JSON.stringify({
+const publishMessage = async (targetId, senderId, text, messageId, timestamp, conversationId) => {
+  // Publish to recipient
+  const recipientEvent = JSON.stringify({
     type: "MESSAGE",
     target_id: targetId,
     sender_id: senderId,
     text,
     message_id: messageId,
     timestamp,
+    conversation_id: conversationId,
   });
+  await publisher.publish(CHANNEL, recipientEvent);
 
-  await publisher.publish(CHANNEL, event);
-  console.log("Message event published to Redis");
+  // Also publish to sender (so they see their own message in real-time)
+  const senderEvent = JSON.stringify({
+    type: "MESSAGE",
+    target_id: senderId,
+    sender_id: senderId,
+    text,
+    message_id: messageId,
+    timestamp,
+    conversation_id: conversationId,
+  });
+  await publisher.publish(CHANNEL, senderEvent);
+
+  console.log("Message event published to Redis for both sender and recipient");
+};
+
+/**
+ * Publish typing event to Redis for delivery to recipient
+ * @param {string} senderId - User who is typing
+ * @param {string} recipientId - User to notify
+ * @param {string} conversationId - Conversation ID (optional for new chats)
+ * @param {boolean} isTyping - true for typing start, false for stop
+ */
+const publishTypingEvent = async (senderId, recipientId, conversationId, isTyping) => {
+  const stateKey = `${conversationId || recipientId}:${senderId}`;
+  
+  // Clear existing timeout for this user/conversation
+  const existingState = typingStates.get(stateKey);
+  if (existingState && existingState.timeoutId) {
+    clearTimeout(existingState.timeoutId);
+  }
+
+  if (isTyping) {
+    // Set up auto-clear timeout
+    const timeoutId = setTimeout(() => {
+      typingStates.delete(stateKey);
+      // Publish stop event when timeout expires
+      const stopEvent = JSON.stringify({
+        type: "TYPING_STOP",
+        target_id: recipientId,
+        sender_id: senderId,
+        conversation_id: conversationId,
+        timestamp: new Date().toISOString(),
+      });
+      publisher.publish(CHANNEL, stopEvent);
+      console.log(`Typing timeout expired for user ${senderId}`);
+    }, TYPING_TIMEOUT);
+
+    typingStates.set(stateKey, { timeoutId });
+
+    // Publish typing start event
+    const event = JSON.stringify({
+      type: "TYPING_START",
+      target_id: recipientId,
+      sender_id: senderId,
+      conversation_id: conversationId,
+      timestamp: new Date().toISOString(),
+    });
+    await publisher.publish(CHANNEL, event);
+  } else {
+    // Stop typing - clear state and publish stop event
+    typingStates.delete(stateKey);
+    
+    const event = JSON.stringify({
+      type: "TYPING_STOP",
+      target_id: recipientId,
+      sender_id: senderId,
+      conversation_id: conversationId,
+      timestamp: new Date().toISOString(),
+    });
+    await publisher.publish(CHANNEL, event);
+  }
+};
+
+/**
+ * Clear typing state for a user (called on disconnect)
+ * @param {string} userId - User who disconnected
+ */
+const clearTypingStateForUser = (userId) => {
+  for (const [key] of typingStates) {
+    if (key.endsWith(`:${userId}`)) {
+      const state = typingStates.get(key);
+      if (state && state.timeoutId) {
+        clearTimeout(state.timeoutId);
+      }
+      typingStates.delete(key);
+    }
+  }
+};
+
+/**
+ * Send initial presence info to a newly connected user
+ * Notifies them which of their chat partners are currently online
+ * @param {string} userId - Newly connected user ID
+ */
+const sendInitialPresence = async (userId) => {
+  try {
+    // Get all chat partners for this user
+    const conversations = await Conversation.find(
+      { participants: userId },
+      { participants: 1 }
+    ).lean();
+
+    // Extract unique partner IDs (exclude self)
+    const partners = [
+      ...new Set(
+        conversations.flatMap((c) =>
+          c.participants
+            .map((p) => p.toString())
+            .filter((p) => p !== userId)
+        )
+      ),
+    ];
+
+    if (partners.length === 0) {
+      console.log(`No chat partners for user ${userId}, skipping initial presence`);
+      return;
+    }
+
+    // Check which partners are currently connected
+    const userSocket = getClient(userId);
+    if (!userSocket || userSocket.readyState !== 1) {
+      return;
+    }
+
+    // Send USER_STATUS for each online partner to the newly connected user
+    for (const partnerId of partners) {
+      const partnerSocket = getClient(partnerId);
+      const isOnline = partnerSocket && partnerSocket.readyState === 1;
+      
+      userSocket.send(
+        JSON.stringify({
+          type: "USER_STATUS",
+          payload: { userId: partnerId, status: isOnline ? "online" : "offline" },
+        })
+      );
+    }
+
+    console.log(`Initial presence sent to user ${userId} for ${partners.length} partners`);
+  } catch (error) {
+    console.error("Failed to send initial presence:", error.message);
+  }
 };
 
 /**
@@ -38,6 +185,11 @@ const publishMessage = async (targetId, senderId, text, messageId, timestamp) =>
  */
 const publishPresence = async (userId, status) => {
   try {
+    // If going offline, clear any typing states for this user
+    if (status === "offline") {
+      clearTypingStateForUser(userId);
+    }
+
     // Query MongoDB for user's chat partners
     const conversations = await Conversation.find(
       { participants: userId },
@@ -101,6 +253,9 @@ const initSubscriber = () => {
       } else if (data.type === "MESSAGE") {
         // Handle chat messages
         handleMessageDelivery(data);
+      } else if (data.type === "TYPING_START" || data.type === "TYPING_STOP") {
+        // Handle typing events
+        handleTypingEventDelivery(data);
       } else {
         console.log(`Unknown event type: ${data.type}`);
       }
@@ -133,10 +288,10 @@ const handlePresenceChange = (data) => {
 
 /**
  * Handle message delivery events from Redis
- * @param {Object} data - { target_id, sender_id, text, message_id, timestamp }
+ * @param {Object} data - { target_id, sender_id, text, message_id, timestamp, conversation_id }
  */
 const handleMessageDelivery = (data) => {
-  const { target_id, sender_id, text, message_id, timestamp } = data;
+  const { target_id, sender_id, text, message_id, timestamp, conversation_id } = data;
 
   const recipientSocket = getClient(target_id);
 
@@ -149,6 +304,7 @@ const handleMessageDelivery = (data) => {
           text,
           message_id,
           timestamp,
+          conversationId: conversation_id,
         },
       })
     );
@@ -158,5 +314,30 @@ const handleMessageDelivery = (data) => {
   }
 };
 
-module.exports = { publishMessage, publishPresence, initSubscriber };
+/**
+ * Handle typing event delivery from Redis
+ * @param {Object} data - { type, target_id, sender_id, conversation_id, timestamp }
+ */
+const handleTypingEventDelivery = (data) => {
+  const { type, target_id, sender_id, conversation_id, timestamp } = data;
+
+  const recipientSocket = getClient(target_id);
+
+  if (recipientSocket && recipientSocket.readyState === 1) {
+    const eventType = type === "TYPING_START" ? "USER_TYPING" : "USER_STOPPED_TYPING";
+    recipientSocket.send(
+      JSON.stringify({
+        type: eventType,
+        payload: {
+          userId: sender_id,
+          conversationId: conversation_id,
+          timestamp,
+        },
+      })
+    );
+  }
+};
+
+module.exports = { publishMessage, publishTypingEvent, publishPresence, initSubscriber, sendInitialPresence };
+
 

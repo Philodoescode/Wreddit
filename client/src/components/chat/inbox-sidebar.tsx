@@ -51,15 +51,19 @@ export function InboxSidebar({
     const unsubscribe = onNewMessage((message) => {
       setConversations((prev) => {
         const updated = prev.map((conv) => {
-          // Check if sender is in this conversation
-          const senderInConv = conv.participants.some(
-            (p) => p._id === message.sender_id
-          );
-          
-          if (senderInConv) {
+          // Match by conversationId (not by sender in participants)
+          if (conv._id === message.conversationId) {
+            // Find the sender info from participants
+            const senderParticipant = conv.participants.find(
+              (p) => p._id === message.sender_id
+            );
+            
             return {
               ...conv,
               last_message: message.text,
+              last_message_sender: senderParticipant
+                ? { _id: senderParticipant._id, username: senderParticipant.username }
+                : null,
               updated_at: message.timestamp,
             };
           }
@@ -86,6 +90,9 @@ export function InboxSidebar({
             return {
               ...conv,
               last_message: ack.text,
+              last_message_sender: user
+                ? { _id: user.id, username: user.username }
+                : null,
               updated_at: ack.created_at,
             };
           }
@@ -101,7 +108,7 @@ export function InboxSidebar({
     });
 
     return unsubscribe;
-  }, [onMessageSent]);
+  }, [onMessageSent, user]);
 
   // Handle user status updates
   useEffect(() => {

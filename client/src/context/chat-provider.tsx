@@ -13,6 +13,7 @@ import type {
   NewMessagePayload,
   MessageSentPayload,
   UserStatusPayload,
+  TypingEventPayload,
   ErrorPayload,
   WebSocketMessage,
 } from "../types/chat.types";
@@ -42,7 +43,12 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const newMessageHandlersRef = useRef<Set<(message: NewMessagePayload) => void>>(new Set());
   const messageSentHandlersRef = useRef<Set<(ack: MessageSentPayload) => void>>(new Set());
   const userStatusHandlersRef = useRef<Set<(status: UserStatusPayload) => void>>(new Set());
+  const userTypingHandlersRef = useRef<Set<(event: TypingEventPayload) => void>>(new Set());
+  const userStoppedTypingHandlersRef = useRef<Set<(event: TypingEventPayload) => void>>(new Set());
   const errorHandlersRef = useRef<Set<(error: ErrorPayload) => void>>(new Set());
+
+  // Ref to store startHeartbeat function for use in handlers without dependency issues
+  const startHeartbeatRef = useRef<() => void>(() => {});
 
   /**
    * Connect to WebSocket server with JWT token
@@ -67,19 +73,16 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     isIntentionalCloseRef.current = false;
 
     try {
-      // Append JWT token to WebSocket URL as query parameter
-      const wsUrl = `${WS_URL}?token=${encodeURIComponent(token)}`;
-      const ws = new WebSocket(wsUrl);
+      // Connect without token in URL (security: avoid token in logs)
+      const ws = new WebSocket(WS_URL);
 
       ws.onopen = () => {
-        console.log("WebSocket connected");
-        setIsConnected(true);
-        setIsConnecting(false);
-        setError(null);
-        reconnectAttemptsRef.current = 0;
-
-        // Start heartbeat to keep connection alive
-        startHeartbeat();
+        console.log("WebSocket connected, sending authentication...");
+        // Send authentication message with token
+        ws.send(JSON.stringify({
+          type: "AUTHENTICATE",
+          payload: { token }
+        }));
       };
 
       ws.onmessage = (event) => {
@@ -117,6 +120,35 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   }, [isAuthenticated, token]);
 
   /**
+   * Stop heartbeat
+   */
+  const stopHeartbeat = useCallback(() => {
+    if (heartbeatIntervalRef.current !== null) {
+      clearInterval(heartbeatIntervalRef.current);
+      heartbeatIntervalRef.current = null;
+    }
+  }, []);
+
+  /**
+   * Start sending periodic heartbeat/ping to keep connection alive
+   */
+  const startHeartbeat = useCallback(() => {
+    stopHeartbeat(); // Clear any existing heartbeat
+
+    heartbeatIntervalRef.current = window.setInterval(() => {
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        console.log("Heartbeat: Connection alive");
+      } else {
+        console.log("Heartbeat: Connection lost");
+        stopHeartbeat();
+      }
+    }, HEARTBEAT_INTERVAL);
+  }, [stopHeartbeat]);
+
+  // Update ref so handleIncomingMessage can use it without dependency issues
+  startHeartbeatRef.current = startHeartbeat;
+
+  /**
    * Disconnect from WebSocket server
    */
   const disconnect = useCallback(() => {
@@ -131,13 +163,30 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
 
     setIsConnected(false);
     setIsConnecting(false);
-  }, []);
+  }, [stopHeartbeat]);
 
   /**
    * Handle incoming WebSocket messages and route to appropriate handlers
    */
   const handleIncomingMessage = useCallback((message: WebSocketMessage) => {
     switch (message.type) {
+      case "AUTH_SUCCESS":
+        // Authentication successful - now fully connected
+        console.log("Authentication successful for user:", message.payload?.userId);
+        setIsConnected(true);
+        setIsConnecting(false);
+        setError(null);
+        reconnectAttemptsRef.current = 0;
+        startHeartbeatRef.current();
+        break;
+
+      case "AUTH_ERROR":
+        // Authentication failed
+        console.error("Authentication failed:", message.payload?.message);
+        setError(message.payload?.message || "Authentication failed");
+        setIsConnecting(false);
+        break;
+
       case "NEW_MESSAGE":
         // Notify all registered new message handlers
         newMessageHandlersRef.current.forEach((handler) => handler(message.payload));
@@ -153,6 +202,16 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         userStatusHandlersRef.current.forEach((handler) => handler(message.payload));
         break;
 
+      case "USER_TYPING":
+        // Notify all registered user typing handlers
+        userTypingHandlersRef.current.forEach((handler) => handler(message.payload));
+        break;
+
+      case "USER_STOPPED_TYPING":
+        // Notify all registered user stopped typing handlers
+        userStoppedTypingHandlersRef.current.forEach((handler) => handler(message.payload));
+        break;
+
       case "ERROR":
         // Notify all registered error handlers
         errorHandlersRef.current.forEach((handler) => handler(message.payload));
@@ -160,6 +219,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         break;
 
       case "connected":
+        // Legacy handler - can be removed after testing
         console.log("Connection acknowledged by server for user:", message.userId);
         break;
 
@@ -193,33 +253,48 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   );
 
   /**
-   * Start sending periodic heartbeat/ping to keep connection alive
+   * Send typing start event
    */
-  const startHeartbeat = useCallback(() => {
-    stopHeartbeat(); // Clear any existing heartbeat
-
-    heartbeatIntervalRef.current = window.setInterval(() => {
-      if (wsRef.current?.readyState === WebSocket.OPEN) {
-        // Send a ping message (you can customize this based on your server)
-        // For now, we just check the connection state
-        // If your server supports ping frames, you can use ws.ping() instead
-        console.log("Heartbeat: Connection alive");
-      } else {
-        console.log("Heartbeat: Connection lost");
-        stopHeartbeat();
+  const sendTypingStart = useCallback(
+    (recipientId: string, conversationId: string) => {
+      if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+        return;
       }
-    }, HEARTBEAT_INTERVAL);
-  }, []);
+
+      const message = {
+        type: "TYPING_START",
+        payload: {
+          recipientId,
+          conversationId,
+        },
+      };
+
+      wsRef.current.send(JSON.stringify(message));
+    },
+    []
+  );
 
   /**
-   * Stop heartbeat
+   * Send typing stop event
    */
-  const stopHeartbeat = useCallback(() => {
-    if (heartbeatIntervalRef.current !== null) {
-      clearInterval(heartbeatIntervalRef.current);
-      heartbeatIntervalRef.current = null;
-    }
-  }, []);
+  const sendTypingStop = useCallback(
+    (recipientId: string, conversationId: string) => {
+      if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+        return;
+      }
+
+      const message = {
+        type: "TYPING_STOP",
+        payload: {
+          recipientId,
+          conversationId,
+        },
+      };
+
+      wsRef.current.send(JSON.stringify(message));
+    },
+    []
+  );
 
   /**
    * Attempt to reconnect with exponential backoff
@@ -285,6 +360,20 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
+  const onUserTyping = useCallback((handler: (event: TypingEventPayload) => void) => {
+    userTypingHandlersRef.current.add(handler);
+    return () => {
+      userTypingHandlersRef.current.delete(handler);
+    };
+  }, []);
+
+  const onUserStoppedTyping = useCallback((handler: (event: TypingEventPayload) => void) => {
+    userStoppedTypingHandlersRef.current.add(handler);
+    return () => {
+      userStoppedTypingHandlersRef.current.delete(handler);
+    };
+  }, []);
+
   const onError = useCallback((handler: (error: ErrorPayload) => void) => {
     errorHandlersRef.current.add(handler);
     return () => {
@@ -340,9 +429,13 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     isConnecting,
     error,
     sendMessage,
+    sendTypingStart,
+    sendTypingStop,
     onNewMessage,
     onMessageSent,
     onUserStatus,
+    onUserTyping,
+    onUserStoppedTyping,
     onError,
     reconnect,
   };

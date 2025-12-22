@@ -27,9 +27,27 @@ export function ConversationListItem({
 
   // Truncate last message
   const truncateText = (text: string, maxLength: number) => {
-    if (!text) return "No messages yet";
+    if (!text) return "";
     if (text.length <= maxLength) return text;
     return text.slice(0, maxLength) + "...";
+  };
+
+  // Format last message with sender prefix
+  const formatLastMessage = () => {
+    if (!conversation.last_message) {
+      return "No messages yet";
+    }
+
+    const sender = conversation.last_message_sender;
+    const truncatedMessage = truncateText(conversation.last_message, 40);
+
+    if (!sender) {
+      // Fallback for old conversations without sender info
+      return truncatedMessage;
+    }
+
+    const senderPrefix = sender._id === currentUserId ? "You" : sender.username;
+    return `${senderPrefix}: ${truncatedMessage}`;
   };
 
   return (
@@ -63,9 +81,9 @@ export function ConversationListItem({
           </span>
         </div>
 
-        {/* Last message preview */}
+        {/* Last message preview with sender */}
         <p className="text-sm text-muted-foreground truncate">
-          {truncateText(conversation.last_message, 50)}
+          {formatLastMessage()}
         </p>
       </div>
     </button>

@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import { cn, getImageUrl } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Loader2, AlertCircle } from "lucide-react";
 import type { Message, MessageStatus } from "@/types/chat.types";
@@ -51,7 +51,7 @@ export function MessageBubble({
         <div className="w-8 shrink-0">
           {showAvatar && isLastInGroup ? (
             <Avatar className="h-8 w-8">
-              <AvatarImage src={sender.userPhotoUrl} alt={sender.username} />
+              <AvatarImage src={getImageUrl(sender.userPhotoUrl)} alt={sender.username} />
               <AvatarFallback className="text-xs">{initials}</AvatarFallback>
             </Avatar>
           ) : null}
