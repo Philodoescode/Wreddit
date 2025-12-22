@@ -13,6 +13,7 @@ import type {
   NewMessagePayload,
   MessageSentPayload,
   UserStatusPayload,
+  TypingEventPayload,
   ErrorPayload,
   WebSocketMessage,
 } from "../types/chat.types";
@@ -42,6 +43,8 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const newMessageHandlersRef = useRef<Set<(message: NewMessagePayload) => void>>(new Set());
   const messageSentHandlersRef = useRef<Set<(ack: MessageSentPayload) => void>>(new Set());
   const userStatusHandlersRef = useRef<Set<(status: UserStatusPayload) => void>>(new Set());
+  const userTypingHandlersRef = useRef<Set<(event: TypingEventPayload) => void>>(new Set());
+  const userStoppedTypingHandlersRef = useRef<Set<(event: TypingEventPayload) => void>>(new Set());
   const errorHandlersRef = useRef<Set<(error: ErrorPayload) => void>>(new Set());
 
   /**
@@ -153,6 +156,16 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         userStatusHandlersRef.current.forEach((handler) => handler(message.payload));
         break;
 
+      case "USER_TYPING":
+        // Notify all registered user typing handlers
+        userTypingHandlersRef.current.forEach((handler) => handler(message.payload));
+        break;
+
+      case "USER_STOPPED_TYPING":
+        // Notify all registered user stopped typing handlers
+        userStoppedTypingHandlersRef.current.forEach((handler) => handler(message.payload));
+        break;
+
       case "ERROR":
         // Notify all registered error handlers
         errorHandlersRef.current.forEach((handler) => handler(message.payload));
@@ -184,6 +197,50 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         payload: {
           recipientId,
           text,
+        },
+      };
+
+      wsRef.current.send(JSON.stringify(message));
+    },
+    []
+  );
+
+  /**
+   * Send typing start event
+   */
+  const sendTypingStart = useCallback(
+    (recipientId: string, conversationId: string) => {
+      if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+        return;
+      }
+
+      const message = {
+        type: "TYPING_START",
+        payload: {
+          recipientId,
+          conversationId,
+        },
+      };
+
+      wsRef.current.send(JSON.stringify(message));
+    },
+    []
+  );
+
+  /**
+   * Send typing stop event
+   */
+  const sendTypingStop = useCallback(
+    (recipientId: string, conversationId: string) => {
+      if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+        return;
+      }
+
+      const message = {
+        type: "TYPING_STOP",
+        payload: {
+          recipientId,
+          conversationId,
         },
       };
 
@@ -285,6 +342,20 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
+  const onUserTyping = useCallback((handler: (event: TypingEventPayload) => void) => {
+    userTypingHandlersRef.current.add(handler);
+    return () => {
+      userTypingHandlersRef.current.delete(handler);
+    };
+  }, []);
+
+  const onUserStoppedTyping = useCallback((handler: (event: TypingEventPayload) => void) => {
+    userStoppedTypingHandlersRef.current.add(handler);
+    return () => {
+      userStoppedTypingHandlersRef.current.delete(handler);
+    };
+  }, []);
+
   const onError = useCallback((handler: (error: ErrorPayload) => void) => {
     errorHandlersRef.current.add(handler);
     return () => {
@@ -340,9 +411,13 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     isConnecting,
     error,
     sendMessage,
+    sendTypingStart,
+    sendTypingStop,
     onNewMessage,
     onMessageSent,
     onUserStatus,
+    onUserTyping,
+    onUserStoppedTyping,
     onError,
     reconnect,
   };

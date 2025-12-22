@@ -9,6 +9,10 @@ const Conversation = require("../model/conversation.model");
 
 const CHANNEL = "global_dispatch";
 
+// Typing state management: Map<`${conversationId}:${userId}`, { timeoutId, userName }>
+const typingStates = new Map();
+const TYPING_TIMEOUT = 6000; // 6 seconds auto-clear
+
 /**
  * Publish a message event to Redis for delivery
  * @param {string} targetId - Recipient user ID
@@ -41,6 +45,80 @@ const publishMessage = async (targetId, senderId, text, messageId, timestamp) =>
   await publisher.publish(CHANNEL, senderEvent);
 
   console.log("Message event published to Redis for both sender and recipient");
+};
+
+/**
+ * Publish typing event to Redis for delivery to recipient
+ * @param {string} senderId - User who is typing
+ * @param {string} recipientId - User to notify
+ * @param {string} conversationId - Conversation ID (optional for new chats)
+ * @param {boolean} isTyping - true for typing start, false for stop
+ */
+const publishTypingEvent = async (senderId, recipientId, conversationId, isTyping) => {
+  const stateKey = `${conversationId || recipientId}:${senderId}`;
+  
+  // Clear existing timeout for this user/conversation
+  const existingState = typingStates.get(stateKey);
+  if (existingState && existingState.timeoutId) {
+    clearTimeout(existingState.timeoutId);
+  }
+
+  if (isTyping) {
+    // Set up auto-clear timeout
+    const timeoutId = setTimeout(() => {
+      typingStates.delete(stateKey);
+      // Publish stop event when timeout expires
+      const stopEvent = JSON.stringify({
+        type: "TYPING_STOP",
+        target_id: recipientId,
+        sender_id: senderId,
+        conversation_id: conversationId,
+        timestamp: new Date().toISOString(),
+      });
+      publisher.publish(CHANNEL, stopEvent);
+      console.log(`Typing timeout expired for user ${senderId}`);
+    }, TYPING_TIMEOUT);
+
+    typingStates.set(stateKey, { timeoutId });
+
+    // Publish typing start event
+    const event = JSON.stringify({
+      type: "TYPING_START",
+      target_id: recipientId,
+      sender_id: senderId,
+      conversation_id: conversationId,
+      timestamp: new Date().toISOString(),
+    });
+    await publisher.publish(CHANNEL, event);
+  } else {
+    // Stop typing - clear state and publish stop event
+    typingStates.delete(stateKey);
+    
+    const event = JSON.stringify({
+      type: "TYPING_STOP",
+      target_id: recipientId,
+      sender_id: senderId,
+      conversation_id: conversationId,
+      timestamp: new Date().toISOString(),
+    });
+    await publisher.publish(CHANNEL, event);
+  }
+};
+
+/**
+ * Clear typing state for a user (called on disconnect)
+ * @param {string} userId - User who disconnected
+ */
+const clearTypingStateForUser = (userId) => {
+  for (const [key] of typingStates) {
+    if (key.endsWith(`:${userId}`)) {
+      const state = typingStates.get(key);
+      if (state && state.timeoutId) {
+        clearTimeout(state.timeoutId);
+      }
+      typingStates.delete(key);
+    }
+  }
 };
 
 /**
@@ -104,6 +182,11 @@ const sendInitialPresence = async (userId) => {
  */
 const publishPresence = async (userId, status) => {
   try {
+    // If going offline, clear any typing states for this user
+    if (status === "offline") {
+      clearTypingStateForUser(userId);
+    }
+
     // Query MongoDB for user's chat partners
     const conversations = await Conversation.find(
       { participants: userId },
@@ -167,6 +250,9 @@ const initSubscriber = () => {
       } else if (data.type === "MESSAGE") {
         // Handle chat messages
         handleMessageDelivery(data);
+      } else if (data.type === "TYPING_START" || data.type === "TYPING_STOP") {
+        // Handle typing events
+        handleTypingEventDelivery(data);
       } else {
         console.log(`Unknown event type: ${data.type}`);
       }
@@ -224,5 +310,30 @@ const handleMessageDelivery = (data) => {
   }
 };
 
-module.exports = { publishMessage, publishPresence, initSubscriber, sendInitialPresence };
+/**
+ * Handle typing event delivery from Redis
+ * @param {Object} data - { type, target_id, sender_id, conversation_id, timestamp }
+ */
+const handleTypingEventDelivery = (data) => {
+  const { type, target_id, sender_id, conversation_id, timestamp } = data;
+
+  const recipientSocket = getClient(target_id);
+
+  if (recipientSocket && recipientSocket.readyState === 1) {
+    const eventType = type === "TYPING_START" ? "USER_TYPING" : "USER_STOPPED_TYPING";
+    recipientSocket.send(
+      JSON.stringify({
+        type: eventType,
+        payload: {
+          userId: sender_id,
+          conversationId: conversation_id,
+          timestamp,
+        },
+      })
+    );
+  }
+};
+
+module.exports = { publishMessage, publishTypingEvent, publishPresence, initSubscriber, sendInitialPresence };
+
 

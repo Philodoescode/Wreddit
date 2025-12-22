@@ -6,7 +6,7 @@
 const Message = require("../model/message.model");
 const Conversation = require("../model/conversation.model");
 const mongoose = require("mongoose");
-const { publishMessage } = require("../redis/messageDispatcher");
+const { publishMessage, publishTypingEvent } = require("../redis/messageDispatcher");
 
 /**
  * Handle incoming WebSocket messages
@@ -29,9 +29,50 @@ const handleMessage = async (ws, rawData) => {
     case "SEND_MESSAGE":
       await handleSendMessage(ws, data.payload);
       break;
+    case "TYPING_START":
+      await handleTypingEvent(ws, data.payload, true);
+      break;
+    case "TYPING_STOP":
+      await handleTypingEvent(ws, data.payload, false);
+      break;
     default:
       // Unknown message type - ignore or log
       console.log(`Unknown message type: ${data.type}`);
+  }
+};
+
+/**
+ * Handle typing start/stop events
+ * @param {WebSocket} ws - WebSocket instance with userId attached
+ * @param {Object} payload - { recipientId, conversationId }
+ * @param {boolean} isTyping - Whether user started or stopped typing
+ */
+const handleTypingEvent = async (ws, payload, isTyping) => {
+  const senderId = ws.userId;
+
+  if (!senderId) {
+    sendError(ws, "UNAUTHORIZED", "Socket not authenticated");
+    return;
+  }
+
+  if (!payload || !payload.recipientId) {
+    sendError(ws, "INVALID_PAYLOAD", "Missing recipientId in typing payload");
+    return;
+  }
+
+  const { recipientId, conversationId } = payload;
+
+  // Validate recipientId
+  if (!mongoose.Types.ObjectId.isValid(recipientId)) {
+    sendError(ws, "INVALID_RECIPIENT", "Invalid recipient ID format");
+    return;
+  }
+
+  try {
+    // Publish typing event to Redis for delivery to recipient
+    await publishTypingEvent(senderId, recipientId, conversationId, isTyping);
+  } catch (error) {
+    console.error("Failed to publish typing event:", error.message);
   }
 };
 
