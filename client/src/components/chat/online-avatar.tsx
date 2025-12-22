@@ -1,5 +1,5 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { cn } from "@/lib/utils";
+import { cn, getImageUrl } from "@/lib/utils";
 
 interface OnlineAvatarProps {
   userId: string;
@@ -40,7 +40,7 @@ export function OnlineAvatar({
   return (
     <div className="relative inline-block">
       <Avatar className={cn(sizeClasses[size])}>
-        <AvatarImage src={userPhotoUrl} alt={username} />
+        <AvatarImage src={getImageUrl(userPhotoUrl)} alt={username} />
         <AvatarFallback className="bg-primary/10 text-primary font-medium">
           {getInitials(username)}
         </AvatarFallback>

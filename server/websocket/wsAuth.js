@@ -1,24 +1,9 @@
 /**
  * WebSocket Authentication Module
- * Handles JWT extraction and validation from query parameters
+ * Handles JWT validation for WebSocket connections
  */
 
 const jwt = require("jsonwebtoken");
-const url = require("url");
-
-/**
- * Extract token from WebSocket request URL
- * @param {string} reqUrl - Request URL (e.g., "/?token=xxx")
- * @returns {string|null} - Token string or null if not found
- */
-const extractToken = (reqUrl) => {
-  try {
-    const parsedUrl = url.parse(reqUrl, true);
-    return parsedUrl.query.token || null;
-  } catch (error) {
-    return null;
-  }
-};
 
 /**
  * Verify JWT token and return user ID
@@ -44,6 +29,5 @@ const verifyToken = (token) => {
 };
 
 module.exports = {
-  extractToken,
   verifyToken,
 };

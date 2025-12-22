@@ -15,6 +15,7 @@ export interface NewMessagePayload {
   text: string;
   message_id: string;
   timestamp: string;
+  conversationId: string;
 }
 
 // Acknowledgment from server when message is sent successfully
@@ -43,12 +44,39 @@ export interface ConnectedPayload {
   userId: string;
 }
 
+// Typing event payload from server
+export interface TypingEventPayload {
+  userId: string;
+  userName?: string;
+  conversationId: string;
+  timestamp: string;
+}
+
+// Authentication payloads
+export interface AuthenticatePayload {
+  token: string;
+}
+
+export interface AuthSuccessPayload {
+  userId: string;
+}
+
+export interface AuthErrorPayload {
+  code: string;
+  message: string;
+}
+
 // WebSocket message envelope types
 export type WebSocketMessage =
+  | { type: "AUTHENTICATE"; payload: AuthenticatePayload }
+  | { type: "AUTH_SUCCESS"; payload: AuthSuccessPayload }
+  | { type: "AUTH_ERROR"; payload: AuthErrorPayload }
   | { type: "SEND_MESSAGE"; payload: SendMessagePayload }
   | { type: "NEW_MESSAGE"; payload: NewMessagePayload }
   | { type: "MESSAGE_SENT"; payload: MessageSentPayload }
   | { type: "USER_STATUS"; payload: UserStatusPayload }
+  | { type: "USER_TYPING"; payload: TypingEventPayload }
+  | { type: "USER_STOPPED_TYPING"; payload: TypingEventPayload }
   | { type: "ERROR"; payload: ErrorPayload }
   | { type: "connected"; userId: string };
 
@@ -61,6 +89,10 @@ export interface Conversation {
     userPhotoUrl?: string;
   }>;
   last_message: string; // Backend stores as plain string
+  last_message_sender?: {
+    _id: string;
+    username: string;
+  } | null;
   updated_at: string;
   created_at: string;
 }
@@ -84,9 +116,13 @@ export interface ChatContextState {
   isConnecting: boolean;
   error: string | null;
   sendMessage: (recipientId: string, text: string) => void;
+  sendTypingStart: (recipientId: string, conversationId: string) => void;
+  sendTypingStop: (recipientId: string, conversationId: string) => void;
   onNewMessage: (handler: (message: NewMessagePayload) => void) => () => void;
   onMessageSent: (handler: (ack: MessageSentPayload) => void) => () => void;
   onUserStatus: (handler: (status: UserStatusPayload) => void) => () => void;
+  onUserTyping: (handler: (event: TypingEventPayload) => void) => () => void;
+  onUserStoppedTyping: (handler: (event: TypingEventPayload) => void) => () => void;
   onError: (handler: (error: ErrorPayload) => void) => () => void;
   reconnect: () => void;
 }
