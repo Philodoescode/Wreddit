@@ -9,7 +9,7 @@ interface DateDividerProps {
  * Format date for display in chat
  * Returns "Today", "Yesterday", or "MMM dd, yyyy"
  */
-function formatDateLabel(date: Date): string {
+export function formatDateLabel(date: Date): string {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const yesterday = new Date(today);
