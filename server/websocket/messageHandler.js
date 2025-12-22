@@ -130,7 +130,8 @@ const handleSendMessage = async (ws, payload) => {
       senderId,
       text,
       message._id.toString(),
-      message.created_at.toISOString()
+      message.created_at.toISOString(),
+      conversation._id.toString()
     );
 
     // Send success acknowledgment to sender

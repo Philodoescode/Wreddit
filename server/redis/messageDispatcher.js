@@ -20,8 +20,9 @@ const TYPING_TIMEOUT = 6000; // 6 seconds auto-clear
  * @param {string} text - Message text
  * @param {string} messageId - MongoDB message ID
  * @param {string} timestamp - Message creation timestamp (ISO string)
+ * @param {string} conversationId - Conversation ID
  */
-const publishMessage = async (targetId, senderId, text, messageId, timestamp) => {
+const publishMessage = async (targetId, senderId, text, messageId, timestamp, conversationId) => {
   // Publish to recipient
   const recipientEvent = JSON.stringify({
     type: "MESSAGE",
@@ -30,6 +31,7 @@ const publishMessage = async (targetId, senderId, text, messageId, timestamp) =>
     text,
     message_id: messageId,
     timestamp,
+    conversation_id: conversationId,
   });
   await publisher.publish(CHANNEL, recipientEvent);
 
@@ -41,6 +43,7 @@ const publishMessage = async (targetId, senderId, text, messageId, timestamp) =>
     text,
     message_id: messageId,
     timestamp,
+    conversation_id: conversationId,
   });
   await publisher.publish(CHANNEL, senderEvent);
 
@@ -285,10 +288,10 @@ const handlePresenceChange = (data) => {
 
 /**
  * Handle message delivery events from Redis
- * @param {Object} data - { target_id, sender_id, text, message_id, timestamp }
+ * @param {Object} data - { target_id, sender_id, text, message_id, timestamp, conversation_id }
  */
 const handleMessageDelivery = (data) => {
-  const { target_id, sender_id, text, message_id, timestamp } = data;
+  const { target_id, sender_id, text, message_id, timestamp, conversation_id } = data;
 
   const recipientSocket = getClient(target_id);
 
@@ -301,6 +304,7 @@ const handleMessageDelivery = (data) => {
           text,
           message_id,
           timestamp,
+          conversationId: conversation_id,
         },
       })
     );

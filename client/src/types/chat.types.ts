@@ -15,6 +15,7 @@ export interface NewMessagePayload {
   text: string;
   message_id: string;
   timestamp: string;
+  conversationId: string;
 }
 
 // Acknowledgment from server when message is sent successfully
