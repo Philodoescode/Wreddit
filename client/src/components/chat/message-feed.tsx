@@ -14,6 +14,11 @@ import type { Message, MessageStatus } from "@/types/chat.types";
 interface MessageFeedProps {
   conversationId: string;
   recipientId: string;
+  recipient: {
+    _id: string;
+    username: string;
+    userPhotoUrl?: string;
+  };
   onConversationResolved?: (pendingId: string, realId: string) => void;
 }
 
@@ -66,7 +71,7 @@ function groupMessages(messages: DisplayMessage[], currentUserId: string) {
   });
 }
 
-export function MessageFeed({ conversationId, recipientId, onConversationResolved }: MessageFeedProps) {
+export function MessageFeed({ conversationId, recipientId, recipient, onConversationResolved }: MessageFeedProps) {
   const { user } = useAuth();
   const { onNewMessage, onMessageSent, sendMessage } = useChat();
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
@@ -285,7 +290,8 @@ export function MessageFeed({ conversationId, recipientId, onConversationResolve
           conversation_id: conversationId,
           sender_id: {
             _id: payload.sender_id,
-            username: "", // Will be populated from context if needed
+            username: recipient.username,
+            userPhotoUrl: recipient.userPhotoUrl,
           },
           text: payload.text,
           created_at: payload.timestamp,
@@ -307,7 +313,7 @@ export function MessageFeed({ conversationId, recipientId, onConversationResolve
     });
 
     return unsubscribe;
-  }, [onNewMessage, conversationId, recipientId, isAtBottom]);
+  }, [onNewMessage, conversationId, recipientId, recipient, isAtBottom]);
 
   // Handle sent message acknowledgment - update optimistic message
   useEffect(() => {

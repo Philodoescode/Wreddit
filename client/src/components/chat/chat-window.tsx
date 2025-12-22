@@ -238,6 +238,7 @@ export function ChatWindow({ conversation, currentUserId, isOnline = false, onCo
       <MessageFeed
         conversationId={conversation._id}
         recipientId={otherParticipant._id}
+        recipient={otherParticipant}
         onConversationResolved={onConversationResolved}
       />
 
